@@ -11,16 +11,19 @@ referenced throughout).
 
 | Role | Responsibility |
 |---|---|
-| **You (human)** | Run commands, review output, make judgment calls, approve each checkpoint before proceeding |
-| **Claude** | Write implementation files and test files, one pair at a time, following the file creation order in `CLAUDE.md` |
+| **You (human)** | Review and approve each WP plan before implementation begins; run commands; QA at each checkpoint |
+| **Claude** | Present a WP-level plan for approval, then implement all files in that WP after approval |
 
 ### Session protocol
 
-1. State which step you are starting (e.g. "We are on step 7, `test_ontology_dg.py`").
-2. Claude writes one file at a time. Read it, ask questions, request changes before proceeding.
-3. After each implementation + test pair, run `pytest` and paste the result.
-4. At each numbered checkpoint, review the full test output together before proceeding.
-5. Commits happen at each checkpoint in conventional-commit format.
+1. **Plan phase (before each WP):** Claude presents a detailed plan for the WP — file-by-file breakdown, design decisions, test strategy, known risks. You review, request changes, and explicitly approve before any code is written.
+2. **Implementation phase (after approval):** Claude writes all files in the WP following the approved plan and the file creation order in `CLAUDE.md`. Tests written alongside implementation.
+3. **QA phase (checkpoint):** You run `pytest` against the completed WP and work through the QA checklist. No work on the next WP begins until the checkpoint passes.
+4. Commits happen at each checkpoint in conventional-commit format.
+
+The approval gate is at the **WP level**: approve the plan → implement the WP → QA → approve the next plan.
+
+**Mid-WP escalation rule:** If during implementation a question arises that requires adjusting or reinterpreting the design documents, Claude stops immediately, describes the issue, and waits for resolution before writing any further code. Do not patch around design ambiguities — surface them.
 
 ### What Claude will not do without being asked
 
