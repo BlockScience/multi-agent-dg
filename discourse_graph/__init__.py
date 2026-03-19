@@ -13,6 +13,13 @@ from discourse_graph.models import (
     Source,
 )
 from discourse_graph.report import VerificationReport
+from discourse_graph.io import (
+    save_store,
+    load_store,
+    save_policy,
+    load_policy,
+    save_policy_sparql,
+)
 
 __all__ = [
     "Agent",
@@ -26,4 +33,9 @@ __all__ = [
     "Question",
     "Source",
     "VerificationReport",
+    "save_store",
+    "load_store",
+    "save_policy",
+    "load_policy",
+    "save_policy_sparql",
 ]

@@ -539,6 +539,7 @@ class DiscourseGraph:
         self,
         policy_name: str,
         grantee_uri: URIRef,
+        override: bool = False,
     ) -> tuple[rdflib.Graph, str]:
         """Export a subgraph according to a named sharing policy.
 
@@ -548,7 +549,13 @@ class DiscourseGraph:
             The ``dg:policyName`` of the policy to compile and execute.
         grantee_uri :
             Must match the ``dg:grantee`` declared in the policy; raises
-            :exc:`ValueError` if mismatched.
+            :exc:`ValueError` if mismatched.  Ignored when *override* is
+            ``True``.
+        override :
+            When ``True``, bypass the grantee equality check.  Use this
+            only as the **policy author** inspecting your own compiled
+            artifact — it does **not** disable INV-P1/P2/P3 assertions.
+            Defaults to ``False`` (accidental-export guard active).
 
         Returns
         -------
@@ -559,7 +566,8 @@ class DiscourseGraph:
         Raises
         ------
         ValueError
-            If *policy_name* is not found or *grantee_uri* does not match.
+            If *policy_name* is not found or (when ``override=False``)
+            *grantee_uri* does not match the declared grantee.
         AssertionError
             If post-conditions INV-P1, INV-P2, or INV-P3 are violated.
         """
@@ -571,9 +579,9 @@ class DiscourseGraph:
         if policy_uri is None:
             raise ValueError(f"Policy {policy_name!r} not found in _policy graph.")
 
-        # FR-POL-10: verify grantee match.
+        # FR-POL-10: verify grantee match (bypassed when override=True).
         declared_grantee = next(self._policy.objects(policy_uri, DG.grantee), None)
-        if declared_grantee != grantee_uri:
+        if not override and declared_grantee != grantee_uri:
             raise ValueError(
                 f"Grantee mismatch: policy declares {declared_grantee!r}, "
                 f"caller supplied {grantee_uri!r}."
