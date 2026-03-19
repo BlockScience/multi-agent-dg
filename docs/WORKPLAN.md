@@ -459,12 +459,12 @@ Run `marimo run notebooks/discourse_graph_demo.py`.
 
 #### Act 4 (cells 18–26): Sharing
 
-- [ ] Cell 18: `export_policy("evidence-sharing", bob.uri)` returns `(exported_A, sparql_A)`.
+- [ ] Cell 18: `export_policy("evidence-sharing", bob_agent.uri)` returns `(exported_A, sparql_A)`.
   - `# INV-P1: excluded node E2 absent from exported graph` — assert passes.
   - `# INV-P2: E1→C1 edge absent (C1 not in permitted set)` — assert passes.
-- [ ] Cell 19: `bob_dg.ingest(exported_A, alice.uri)` returns ingested graph URI; printed.
+- [ ] Cell 19: `bob_dg.ingest(exported_A, alice_agent.uri)` returns ingested graph URI; printed.
 - [ ] Cell 20: Bob adds `dg:informs` E1→Q2 and `eng:justification` D2→E1.
-- [ ] Cell 21: `export_policy("arch-claim", bob.uri)` returns `(exported_B, sparql_B)`.
+- [ ] Cell 21: `export_policy("arch-claim", bob_agent.uri)` returns `(exported_B, sparql_B)`.
   - C1 present; E1/E2 absent; no incoming discourse edges on C1.
 - [ ] Cell 22: Bob ingests C1 from Policy B.
 - [ ] Cell 23: Bob creates A1 (`eng:Assumption`) with `prov:wasDerivedFrom` C1* and declared scope.
