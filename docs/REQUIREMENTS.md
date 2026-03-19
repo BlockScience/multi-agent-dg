@@ -171,3 +171,11 @@ Each is tested explicitly in the test suite and asserted in `export_policy`.
 - Concurrent write access
 - SPARQL endpoint / HTTP API
 - MCP server interface (documented as future layer)
+
+---
+
+## Change log
+
+| Date | What changed | Why / decision trigger |
+|---|---|---|
+| 2026-03-19 | Initial document created | Project scaffold — all requirement groups and INV-P1–INV-P5 established |

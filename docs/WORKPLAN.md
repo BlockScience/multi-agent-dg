@@ -25,6 +25,8 @@ The approval gate is at the **WP level**: approve the plan → implement the WP 
 
 **Mid-WP escalation rule:** If during implementation a question arises that requires adjusting or reinterpreting the design documents, Claude stops immediately, describes the issue, and waits for resolution before writing any further code. Do not patch around design ambiguities — surface them.
 
+**Design doc change log rule:** Any change to a design document (`docs/ARCHITECTURE.md`, `docs/REQUIREMENTS.md`, `docs/DESIGN.md`, `docs/BOM.md`) must be accompanied by a new entry appended to the change log at the bottom of that document. Format: `| YYYY-MM-DD | <what changed> | <why / decision trigger> |`. Append only — do not edit past records.
+
 ### What Claude will not do without being asked
 
 - Modify `pyproject.toml`

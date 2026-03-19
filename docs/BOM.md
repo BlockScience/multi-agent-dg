@@ -69,3 +69,11 @@ dependencies = [
 notebook = ["marimo>=0.10"]
 dev = ["pytest>=8.0", "pytest-cov>=5.0"]
 ```
+
+---
+
+## Change log
+
+| Date | What changed | Why / decision trigger |
+|---|---|---|
+| 2026-03-19 | Initial document created | Project scaffold — runtime, notebook, dev dependencies and pyproject.toml stub set |

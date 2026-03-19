@@ -570,3 +570,11 @@ SPARQL is an implementation detail of `_compile_policy`.
 
 Full OWL imports and formal alignment deferred until namespace is minted
 at a resolvable PURL or firm-controlled HTTPS IRI.
+
+---
+
+## Change log
+
+| Date | What changed | Why / decision trigger |
+|---|---|---|
+| 2026-03-19 | Initial document created | Project scaffold — ConOps, layers, policy pipeline, demo arc established |

@@ -1148,3 +1148,11 @@ independent of the demo domain content.
 | `test_assumption_as1_scope` | Assumption without scope fails AS-1 |
 | `test_assumption_prov_derivation` | `to_triples` includes `prov:wasDerivedFrom` when set |
 
+---
+
+## Change log
+
+| Date | What changed | Why / decision trigger |
+|---|---|---|
+| 2026-03-19 | Initial document created | Project scaffold — ontology, SHACL, class APIs, notebook spec, domain content established |
+

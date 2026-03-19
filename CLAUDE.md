@@ -238,3 +238,17 @@ git commit -m "chore: initial project scaffold from design documents"
 
 Commit after each passing checkpoint. Commit messages follow
 conventional commits: `feat:`, `test:`, `fix:`, `docs:`, `chore:`.
+
+---
+
+## Design document change log
+
+Any change to a design document (`docs/ARCHITECTURE.md`, `docs/REQUIREMENTS.md`,
+`docs/DESIGN.md`, `docs/BOM.md`) must be accompanied by a new entry appended
+to the change log section at the bottom of that document. Format:
+
+```
+| YYYY-MM-DD | <what changed> | <why / decision trigger> |
+```
+
+Do not edit the change log entries of past records. Append only.
