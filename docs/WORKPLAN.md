@@ -426,7 +426,7 @@ Run `marimo run notebooks/discourse_graph_demo.py`.
 
 #### Act 1 (cells 1–5): Setup
 
-- [ ] Cell 0: Header renders. Layer table and two-policy summary visible.
+- [ ] Cell 0: BLUF hook renders. Opening sentence bold. Link to `https://discoursegraphs.com/docs/roam/base-grammar` present. Layer table and two-policy summary visible below.
 - [ ] Cell 1: Only `discourse_graph` imports visible. No `rdflib`, `pyshacl`, or SPARQL imports in the cell.
 - [ ] Cell 2: Prints triple counts for `dg:` and `eng:` ontologies (non-zero).
 - [ ] Cell 3: Prints shape names with requirement IDs (QS-1 through OP-1).

@@ -908,11 +908,49 @@ The demo also shows `eng:opens`: Alice's D1 decision explicitly opens Q2
 (the thruster configuration question), making the design process traversable
 as a directed graph from Q1 through D1 to Q2.
 
+### Cell 0 — BLUF hook (exact text)
+
+Cell 0 must open with this paragraph before the title, layer table, and
+two-policy summary. It is the audience's entry point and must stand alone
+as a complete answer to "why should I care?".
+
+```markdown
+**Knowledge sharing across agents is only meaningful if the epistemic
+provenance of each shared item is preserved and legible.**
+
+This notebook demonstrates a Python implementation of the
+[discoursegraphs.com base grammar](https://discoursegraphs.com/docs/roam/base-grammar)
+— a formal information model for collaborative scientific and engineering
+reasoning. The grammar defines a small set of node types (Question, Claim,
+Evidence, Source) and predicates (supports, opposes, answers, informs) that
+together make the structure of an argument machine-readable.
+
+Here, two agents work in parallel on a lunar transfer stage propulsion trade
+study. AliceGroup (systems architecture) declares two sharing policies with
+different epistemic characters: one shares raw Evidence with full provenance;
+the other shares a Claim without its backing evidence. BobGroup (propulsion)
+must handle these differently — the Evidence is used directly, but the Claim
+must be promoted to an explicit `eng:Assumption` with declared scope. The
+result is a traceable, machine-checkable reasoning graph in which every
+knowledge transfer is formally described, every epistemic status is explicit,
+and every policy boundary is enforced by a compiled SPARQL query.
+```
+
+The implementation follows scientific Python conventions throughout — Pydantic
+models for node authoring, type-annotated APIs, and NumPy-style docstrings —
+so that the formal machinery (OWL 2 DL ontology, SHACL validation, SPARQL
+policy compilation) stays under the hood while the surface API remains
+lightweight enough to integrate into existing data pipelines and analysis
+workflows.
+
+The layer table and two-policy summary follow this paragraph inside the same
+cell.
+
 ### Cell sequence
 
 | Cell | Act | Title | Content |
 |---|---|---|---|
-| 0 | — | Header | `mo.md(...)` — title, domain, layer table, two-policy summary |
+| 0 | — | Header | BLUF hook (see above), title, layer table, two-policy summary |
 | 1 | 1 | Imports | `from discourse_graph import ..., DISCOURSE_PREDICATES` — no RDF imports visible |
 | 2 | 1 | Ontology | `load_dg_ontology()`, `load_eng_ontology()` — print triple counts |
 | 3 | 1 | SHACL shapes | `load_shapes()` — print shape names and req IDs |
