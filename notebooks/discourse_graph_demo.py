@@ -114,12 +114,36 @@ def cell_1_header(mo):
     return
 
 
-# ── Act 1: Setup ──────────────────────────────────────────────────────────────
+# ── Cell 1b: Scenario intro ────────────────────────────────────────────────────
+
+@app.cell(hide_code=True)
+def cell_1b_scenario(mo):
+    """Scenario prose: two teams, one mission, the controlled-sharing challenge."""
+    mo.vstack([
+        mo.md("## Act 1 — Setup"),
+        mo.md("""
+Alice's team (systems architecture) and Bob's team (propulsion subsystem) are
+working the same mission. Each team maintains its own discourse graph — a typed
+directed graph of Questions, Claims, Evidence, and Decisions connected by
+formally-defined predicates.
+
+The hard problem is controlled sharing. Alice has empirical findings she is
+willing to share directly. She also has architectural claims whose evidence chain
+she is not willing to expose — perhaps it is proprietary, perhaps it is simply
+not ready. She wants Bob to be able to use her conclusions without being able to
+inspect the reasoning behind them.
+
+This notebook shows how the discourse-graph library handles that. Alice writes
+Python. The library produces inspectable RDF and SPARQL. The access boundaries
+are formally enforced, not just agreed by convention.
+"""),
+    ])
+    return
+
 
 @app.cell(hide_code=True)
 def cell_2_ontology(mo, load_combined_ontology):
     """Load combined dg: + eng: ontology."""
-    mo.md("## Act 1 — Setup")
     ontology = load_combined_ontology()
     mo.vstack([
         mo.md(f"**Ontology loaded:** {len(ontology)} triples (dg: + eng: merged)"),
@@ -151,6 +175,16 @@ def cell_3_shapes(mo, load_shapes):
     mo.vstack([
         mo.md(f"**Shapes loaded:** {len(shapes)} triples"),
         mo.md(_shape_table),
+        mo.callout(
+            mo.md(
+                "SHACL and Pydantic serve different roles: Pydantic validates the model instance "
+                "at Python call time; SHACL validates the serialized RDF graph after triples are "
+                "written. Both are required — some constraints (such as ES-2's requirement that "
+                "Evidence must support or inform at least one node) can only be checked once the "
+                "edges exist in the graph."
+            ),
+            kind="info",
+        ),
     ])
     return (shapes,)
 
@@ -165,6 +199,14 @@ def cell_4_agents(mo, Agent):
         mo.md(f"- `alice_agent.uri` = `{alice_agent.uri}`"),
         mo.md(f"- `bob_agent.uri`   = `{bob_agent.uri}`"),
         mo.md(f"- `alice_agent.graph_uri('local')` = `{alice_agent.graph_uri('local')}`"),
+        mo.callout(
+            mo.md(
+                "An `Agent` is a namespace owner and URI minter: it holds the base IRI for a "
+                "team's graph, mints node and named-graph URIs under that namespace, and carries "
+                "the agent identifier used in provenance triples (`prov:wasAttributedTo`)."
+            ),
+            kind="info",
+        ),
     ])
     return (alice_agent, bob_agent)
 
@@ -183,16 +225,54 @@ def cell_5_discourse_graphs(mo, DiscourseGraph, alice_agent, bob_agent, ontology
             ),
             kind="info",
         ),
+        mo.callout(
+            mo.md(
+                "A `DiscourseGraph` holds a ConjunctiveGraph (`_store`) for typed node triples "
+                "and discourse edges, a structurally isolated `_policy` Graph for sharing policy "
+                "RDF, and references to the ontology and shapes for on-demand SHACL validation. "
+                "The `_policy` graph is never merged into `_store` — this structural isolation "
+                "is how INV-P3 is enforced."
+            ),
+            kind="info",
+        ),
     ])
     return (alice_dg, bob_dg)
+
+
+# ── Cell 5b: Bridge to Act 2 ───────────────────────────────────────────────────
+
+@app.cell(hide_code=True)
+def cell_5b_what_next(mo):
+    """Bridge narration: what Act 2 is about to do and why."""
+    mo.md("""
+Both agents have empty discourse graphs in their own namespaces. In Act 2 each
+team populates their graph independently, without any communication. Notice that
+`add()` is the only write method: it takes a Pydantic model, mints a URI, stamps
+a timestamp, and writes the RDF triples. No Turtle, no SPARQL, no rdflib
+constructor calls in user code.
+""")
+    return
 
 
 # ── Act 2: Individual graphs ───────────────────────────────────────────────────
 
 @app.cell(hide_code=True)
-def cell_6_populate_alice(mo, alice_dg, DG, ENG, Question, Claim, Evidence, Decision):
+def cell_6_act2_narration(mo):
+    """Act 2 heading and narrative context."""
+    mo.vstack([
+        mo.md("## Act 2 — Individual Graphs"),
+        mo.md("""
+Each team builds their discourse graph in isolation. Alice models the propulsion
+architecture trade study. Bob models the thruster configuration analysis. Both
+graphs are validated against the SHACL shapes before any sharing takes place.
+"""),
+    ])
+    return
+
+
+@app.cell(hide_code=True)
+def cell_7_populate_alice(mo, alice_dg, DG, ENG, Question, Claim, Evidence, Decision):
     """Populate Alice's discourse graph with the propulsion trade study nodes."""
-    mo.md("## Act 2 — Individual Graphs")
 
     # ── Nodes ─────────────────────────────────────────────────────────────────
     alice_Q1 = alice_dg.add(Question(
@@ -257,7 +337,7 @@ def cell_6_populate_alice(mo, alice_dg, DG, ENG, Question, Claim, Evidence, Deci
 
 
 @app.cell(hide_code=True)
-def cell_7_validate_alice(mo, alice_dg):
+def cell_8_validate_alice(mo, alice_dg):
     """Run SHACL verification on Alice's graph."""
     with mo.status.spinner(title="Running SHACL validation on Alice's graph…"):
         report_alice = alice_dg.verify()
@@ -274,7 +354,7 @@ def cell_7_validate_alice(mo, alice_dg):
 
 
 @app.cell(hide_code=True)
-def cell_8_visualize_alice(mo, plt, alice_dg, visualize_graph):
+def cell_9_visualize_alice(mo, plt, alice_dg, visualize_graph):
     """Render Alice's full graph."""
     _fig, _ax = plt.subplots(figsize=(10, 7))
     visualize_graph(alice_dg, ax=_ax, title="AliceGroup — full graph (pre-sharing)")
@@ -283,15 +363,19 @@ def cell_8_visualize_alice(mo, plt, alice_dg, visualize_graph):
         mo.as_html(_fig),
         mo.md(
             "*Node colours: steelblue = Question, seagreen = Claim, goldenrod = Evidence, "
-            "mediumpurple = Decision. D1 is connected to Q1 (eng:decision), C1 and E1 "
-            "(eng:justification), and Q2 (eng:opens).*"
+            "mediumpurple = Decision.*\n\n"
+            "D1 (`eng:decision`) → Q1: the decision resolves Q1. "
+            "D1 (`eng:justification`) → C1 and E1: the claim and evidence that justify the decision. "
+            "D1 (`eng:opens`) → Q2: the decision raises a downstream question for BobGroup. "
+            "E1 (`dg:supports`) → C1: empirical evidence backing the baseline claim. "
+            "E1 (`dg:informs`) → Q1: the delta-V budget directly informs the architecture question."
         ),
     ])
     return
 
 
 @app.cell(hide_code=True)
-def cell_9_populate_bob(mo, bob_dg, DG, ENG, Question, Claim, Evidence, Decision):
+def cell_10_populate_bob(mo, bob_dg, DG, ENG, Question, Claim, Evidence, Decision):
     """Populate Bob's pre-sharing discourse graph."""
     # Bob mints his own Q2 in his own namespace.
     # In a production federation the two teams would agree on a shared Q2 URI;
@@ -337,7 +421,7 @@ def cell_9_populate_bob(mo, bob_dg, DG, ENG, Question, Claim, Evidence, Decision
 
 
 @app.cell(hide_code=True)
-def cell_10_validate_bob(mo, bob_dg):
+def cell_11_validate_bob(mo, bob_dg):
     """Run SHACL verification on Bob's pre-sharing graph."""
     with mo.status.spinner(title="Running SHACL validation on Bob's graph…"):
         report_bob_pre = bob_dg.verify()
@@ -351,7 +435,7 @@ def cell_10_validate_bob(mo, bob_dg):
 
 
 @app.cell(hide_code=True)
-def cell_11_visualize_bob(mo, plt, bob_dg, visualize_graph):
+def cell_12_visualize_bob(mo, plt, bob_dg, visualize_graph):
     """Render Bob's pre-sharing graph."""
     _fig, _ax = plt.subplots(figsize=(8, 6))
     visualize_graph(bob_dg, ax=_ax, title="BobGroup — pre-sharing graph")
@@ -367,13 +451,48 @@ def cell_11_visualize_bob(mo, plt, bob_dg, visualize_graph):
     return
 
 
+# ── Cell 11b: Close Act 2 ─────────────────────────────────────────────────────
+
+@app.cell(hide_code=True)
+def cell_12b_act2_close(mo):
+    """Act 2 closing narration: both graphs conform; the hard problem begins."""
+    mo.md("""
+Both graphs conform. Alice has a complete reasoning chain from Q1 through Evidence
+to Decision. Bob has a complete chain from his Q2 through Evidence to D2.
+
+The problem: Bob's D2 is grounded in Bob's own evidence only. Alice has empirical
+findings (E1: the delta-V budget) and a baseline claim (C1: bipropellant is the
+architecture) that Bob could use — if Alice chooses to share them, and in a form
+she controls.
+""")
+    return
+
+
 # ── Act 3: Policy declaration ─────────────────────────────────────────────────
 
 @app.cell(hide_code=True)
-def cell_12_policy_a_declared(mo, alice_dg, alice_agent, bob_agent, alice_E2, DG):
-    """Alice declares the 'evidence-sharing' policy."""
-    mo.md("## Act 3 — Policy Declaration")
+def cell_13_act3_narration(mo):
+    """Act 3 heading and narrative context."""
+    mo.vstack([
+        mo.md("## Act 3 — Policy Declaration"),
+        mo.md("""
+Alice declares two sharing policies in Python. Each policy names a grantee, a
+source graph, and a selection rule (type-based or node-explicit). The library
+stores each policy as a `dg:SharingPolicy` individual in a structurally isolated
+`_policy` graph — it never touches `_store`. At export time the policy is
+compiled to a SPARQL CONSTRUCT query.
 
+This act shows the artifacts. The SPARQL was not written by Alice; it was
+generated from the RDF. This is the architectural guarantee: Alice cannot write
+a malformed policy by accident, and the query is always inspectable.
+"""),
+    ])
+    return
+
+
+@app.cell(hide_code=True)
+def cell_14_policy_a_declared(mo, alice_dg, alice_agent, bob_agent, alice_E2, DG):
+    """Alice declares the 'evidence-sharing' policy."""
     policy_A_uri = alice_dg.declare_sharing_policy(
         name="evidence-sharing",
         grantee_uri=bob_agent.uri,
@@ -394,7 +513,7 @@ def cell_12_policy_a_declared(mo, alice_dg, alice_agent, bob_agent, alice_E2, DG
 
 
 @app.cell(hide_code=True)
-def cell_13_policy_a_rdf(mo, alice_dg):
+def cell_15_policy_a_rdf(mo, alice_dg):
     """Print the RDF Turtle serialization of alice_dg._policy.
 
     This is the 'lift the hood' moment: the audience sees that Alice's Python
@@ -409,12 +528,22 @@ def cell_13_policy_a_rdf(mo, alice_dg):
             "`dg:includesType`, `dg:excludesNode`."
         ),
         mo.md(f"```turtle\n{_turtle}\n```"),
+        mo.callout(
+            mo.md(
+                "`alice_dg._policy` is a standalone `rdflib.Graph` — it is never passed to "
+                "`_store.get_context()`, `_store.addN()`, or any SPARQL query. "
+                "This structural isolation is the enforcement mechanism for INV-P3: a compromised "
+                "`export_policy()` implementation cannot leak triples from `_store` into an "
+                "unauthorized export, because `_policy` is never in `_store`."
+            ),
+            kind="info",
+        ),
     ])
     return
 
 
 @app.cell(hide_code=True)
-def cell_14_policy_a_sparql(mo, alice_dg, policy_A_uri):
+def cell_16_policy_a_sparql(mo, alice_dg, policy_A_uri):
     """Compile Policy A to SPARQL and display the generated query."""
     sparql_A, permitted_A = alice_dg._compile_policy(policy_A_uri)
 
@@ -424,9 +553,12 @@ def cell_14_policy_a_sparql(mo, alice_dg, policy_A_uri):
         mo.md("### Policy A — compiled SPARQL CONSTRUCT"),
         mo.md(
             "The SPARQL was generated from the RDF policy above — Alice never wrote SQL or SPARQL. "
-            "The `VALUES ?s` clause scopes subjects to the permitted set. "
-            "The `FILTER` implements the **edge-bounding rule** (FR-POL-9): "
-            "a triple `(s, p, o)` is exported only if `s ∈ permitted` AND "
+            "In plain English, the edge-bounding rule says: a triple `(s, p, o)` may only be "
+            "exported if the subject `s` is in the permitted set AND either the object is a plain "
+            "value (literal), the predicate is not a discourse predicate, or the object is also in "
+            "the permitted set. This prevents edges from escaping the policy boundary even when "
+            "both endpoints happen to exist in Alice's store. "
+            "Formally: `(s, p, o)` exported iff `s ∈ permitted` AND "
             "(`isLiteral(o)` OR `p ∉ DISCOURSE_PREDICATES` OR `o ∈ permitted`)."
         ),
         mo.md(f"```sparql\n{sparql_A}\n```"),
@@ -436,7 +568,7 @@ def cell_14_policy_a_sparql(mo, alice_dg, policy_A_uri):
 
 
 @app.cell(hide_code=True)
-def cell_15_policy_b_declared(mo, alice_dg, alice_agent, bob_agent, alice_C1):
+def cell_17_policy_b_declared(mo, alice_dg, alice_agent, bob_agent, alice_C1):
     """Alice declares the 'arch-claim' policy."""
     policy_B_uri = alice_dg.declare_sharing_policy(
         name="arch-claim",
@@ -463,7 +595,7 @@ def cell_15_policy_b_declared(mo, alice_dg, alice_agent, bob_agent, alice_C1):
 
 
 @app.cell(hide_code=True)
-def cell_16_policy_b_rdf(mo, alice_dg):
+def cell_18_policy_b_rdf(mo, alice_dg):
     """Print updated _policy Turtle — now contains both policies."""
     _turtle = alice_dg._policy.serialize(format="turtle")
     mo.vstack([
@@ -481,7 +613,7 @@ def cell_16_policy_b_rdf(mo, alice_dg):
 
 
 @app.cell(hide_code=True)
-def cell_17_policy_b_sparql(mo, alice_dg, policy_B_uri):
+def cell_19_policy_b_sparql(mo, alice_dg, policy_B_uri):
     """Compile Policy B to SPARQL."""
     sparql_B, permitted_B = alice_dg._compile_policy(policy_B_uri)
 
@@ -503,10 +635,25 @@ def cell_17_policy_b_sparql(mo, alice_dg, policy_B_uri):
 # ── Act 4: Sharing ─────────────────────────────────────────────────────────────
 
 @app.cell(hide_code=True)
-def cell_18_push_policy_a(mo, alice_dg, bob_agent, DG, alice_E1, alice_E2, alice_C1):
-    """Alice exports Policy A to Bob."""
-    mo.md("## Act 4 — Sharing")
+def cell_20_act4_narration(mo):
+    """Act 4 heading and narrative context."""
+    mo.vstack([
+        mo.md("## Act 4 — Sharing"),
+        mo.md("""
+Alice pushes each policy to Bob. For each export the system executes the compiled
+SPARQL CONSTRUCT against Alice's store and applies the edge-bounding rule: a
+triple `(s, p, o)` is exported only when `s` is in the permitted set AND either
+`o` is a literal, `p` is not a discourse predicate, or `o` is also in the
+permitted set. This prevents discourse edges from crossing the policy boundary
+even when both endpoints exist.
+"""),
+    ])
+    return
 
+
+@app.cell(hide_code=True)
+def cell_21_push_policy_a(mo, alice_dg, bob_agent, DG, alice_E1, alice_E2, alice_C1):
+    """Alice exports Policy A to Bob."""
     exported_A, _ = alice_dg.export_policy("evidence-sharing", bob_agent.uri)
 
     # INV-P1: excluded node E2 absent from exported graph
@@ -537,7 +684,7 @@ def cell_18_push_policy_a(mo, alice_dg, bob_agent, DG, alice_E1, alice_E2, alice
 
 
 @app.cell(hide_code=True)
-def cell_19_bob_ingests_a(mo, bob_dg, alice_agent, exported_A):
+def cell_22_bob_ingests_a(mo, bob_dg, alice_agent, exported_A):
     """Bob ingests Policy A export — E1 arrives with provenance."""
     ingested_A_uri = bob_dg.ingest(exported_A, alice_agent.uri)
 
@@ -545,21 +692,25 @@ def cell_19_bob_ingests_a(mo, bob_dg, alice_agent, exported_A):
         mo.md(f"**E1 ingested** into `{ingested_A_uri}`"),
         mo.md(f"- Ingested graph triple count: {bob_dg.triple_count(ingested_A_uri)}"),
         mo.callout(mo.md(
-            "E1 now has `rdf:type dg:IngestedNode` and `prov:wasAttributedTo alice_agent.uri`. "
-            "IS-1 is satisfied."
+            "`dg:IngestedNode` is a provenance wrapper, not a type change. E1 remains a "
+            "`dg:Evidence` — it retains all its original triples. The `IngestedNode` type adds "
+            "three provenance assertions: `rdf:type dg:IngestedNode`, "
+            "`prov:wasAttributedTo alice_agent.uri`, and `dg:ingestedAt <timestamp>`. "
+            "Bob can use E1 exactly as he would a locally-minted Evidence node, while the "
+            "provenance chain remains inspectable. IS-1 is satisfied."
         ), kind="info"),
     ])
     return (ingested_A_uri,)
 
 
 @app.cell(hide_code=True)
-def cell_20_bob_uses_e1(mo, bob_dg, alice_E1, bob_Q2, bob_D2, DG, ENG):
+def cell_23_bob_uses_e1(mo, bob_dg, alice_E1, bob_Q2, bob_D2, DG, ENG):
     """Bob uses E1 directly — empirical finding accepted as-is."""
     bob_dg.add_edge(alice_E1, DG.informs,        bob_Q2)
     bob_dg.add_edge(bob_D2,   ENG.justification, alice_E1)
 
     mo.callout(mo.md(
-        "Bob connects E1 directly: `E1 dg:informs alice_Q2` and `D2 eng:justification E1`. "
+        "Bob connects E1 directly: `E1 dg:informs bob_Q2` and `D2 eng:justification E1`. "
         "Evidence type is unchanged — an empirical finding is an empirical finding, "
         "regardless of provenance. Bob traces attribution via `prov:wasAttributedTo`."
     ), kind="info")
@@ -567,7 +718,7 @@ def cell_20_bob_uses_e1(mo, bob_dg, alice_E1, bob_Q2, bob_D2, DG, ENG):
 
 
 @app.cell(hide_code=True)
-def cell_21_push_policy_b(mo, alice_dg, bob_agent, alice_C1, alice_E1, alice_E2, DG):
+def cell_24_push_policy_b(mo, alice_dg, bob_agent, alice_C1, alice_E1, alice_E2, DG):
     """Alice exports Policy B to Bob."""
     exported_B, _ = alice_dg.export_policy("arch-claim", bob_agent.uri)
 
@@ -598,14 +749,14 @@ def cell_21_push_policy_b(mo, alice_dg, bob_agent, alice_C1, alice_E1, alice_E2,
 
 
 @app.cell(hide_code=True)
-def cell_22_bob_ingests_b(mo, bob_dg, alice_agent, exported_B):
+def cell_25_bob_ingests_b(mo, bob_dg, alice_agent, exported_B):
     """Bob ingests Policy B export — C1 arrives with no backing."""
     ingested_B_uri = bob_dg.ingest(exported_B, alice_agent.uri)
 
     mo.vstack([
         mo.md(f"**C1 ingested** into `{ingested_B_uri}`"),
         mo.callout(mo.md(
-            "C1 is now in Bob's graph as an `dg:IngestedNode`. "
+            "C1 is now in Bob's graph as a `dg:IngestedNode`. "
             "It carries `prov:wasAttributedTo alice_agent.uri` but no supporting evidence. "
             "Bob must decide how to treat this isolated claim."
         ), kind="warn"),
@@ -613,8 +764,30 @@ def cell_22_bob_ingests_b(mo, bob_dg, alice_agent, exported_B):
     return (ingested_B_uri,)
 
 
+# ── Cell 22b: Two objects ─────────────────────────────────────────────────────
+
 @app.cell(hide_code=True)
-def cell_23_bob_promotes_c1(mo, bob_dg, alice_C1, alice_agent, PROV, Assumption):
+def cell_25b_two_objects(mo):
+    """Key insight: the two policies produced two qualitatively different epistemic objects."""
+    mo.md("""
+Bob now has two items from Alice in his graph:
+
+- **E1** — an empirical finding (Evidence). It arrived with full provenance:
+  `prov:wasAttributedTo alice_agent`. Its type is unchanged. Bob can treat it
+  exactly like his own Evidence.
+
+- **C1** — an architectural claim. It arrived as an isolated assertion. Alice's
+  Policy B withheld E1 and E2 entirely; the edge-bounding rule dropped the
+  `dg:supports` edges. Bob cannot see the reasoning behind C1.
+
+The two policies produced two qualitatively different epistemic objects. Bob must
+handle them differently.
+""")
+    return
+
+
+@app.cell(hide_code=True)
+def cell_26_bob_promotes_c1(mo, bob_dg, alice_C1, alice_agent, PROV, Assumption):
     """Bob creates an Assumption derived from C1 — honest epistemic act."""
     _a1_model = Assumption(
         label="A1-BipropAccepted",
@@ -631,10 +804,12 @@ def cell_23_bob_promotes_c1(mo, bob_dg, alice_C1, alice_agent, PROV, Assumption)
     mo.vstack([
         mo.md(f"**A1 created:** `{bob_A1}`"),
         mo.callout(mo.md(
-            "Bob's A1 is an explicit **Assumption**: he records that he is accepting "
-            "Alice's claim (C1) without access to its evidence chain. "
-            "`prov:wasDerivedFrom C1` and `prov:wasAttributedTo alice_agent.uri` "
-            "preserve the attribution chain. "
+            "Why `Assumption` and not `Claim`? A `Claim` represents an assertion whose evidence "
+            "chain is locally inspectable. Bob cannot see the reasoning behind C1 — Alice's policy "
+            "withheld E1 and E2. Promoting C1 to a local Claim would misrepresent its epistemic "
+            "status. An `Assumption` is honest: it records that Bob is accepting C1 without access "
+            "to its justification, names the scope under which that acceptance holds, and points "
+            "back to Alice's authorship via `prov:wasAttributedTo`. "
             "AS-1 requires `eng:assumptionScope` — satisfied by the `scope` field."
         ), kind="warn"),
     ])
@@ -642,7 +817,7 @@ def cell_23_bob_promotes_c1(mo, bob_dg, alice_C1, alice_agent, PROV, Assumption)
 
 
 @app.cell(hide_code=True)
-def cell_24_bob_decision_grounded(mo, bob_dg, bob_D2, bob_C3, bob_E3, alice_E1, bob_A1, ENG):
+def cell_27_bob_decision_grounded(mo, bob_dg, bob_D2, bob_C3, bob_E3, alice_E1, bob_A1, ENG):
     """Bob grounds D2 in A1, completing the justification chain."""
     bob_dg.add_edge(bob_D2, ENG.justification, bob_A1)
 
@@ -661,7 +836,7 @@ def cell_24_bob_decision_grounded(mo, bob_dg, bob_D2, bob_C3, bob_E3, alice_E1, 
 
 
 @app.cell(hide_code=True)
-def cell_25_validate_bob_post(mo, bob_dg):
+def cell_28_validate_bob_post(mo, bob_dg):
     """Verify Bob's post-sharing graph — all shapes must pass."""
     with mo.status.spinner(title="Running SHACL validation on Bob's post-sharing graph…"):
         report_bob_post = bob_dg.verify()
@@ -680,8 +855,21 @@ def cell_25_validate_bob_post(mo, bob_dg):
     return (report_bob_post,)
 
 
+# ── Cell 25b: Close Act 4 ─────────────────────────────────────────────────────
+
 @app.cell(hide_code=True)
-def cell_26_invariants(
+def cell_28b_act4_close(mo):
+    """Act 4 closing narration: full graph passes; invariants coming up."""
+    mo.md("""
+Bob's full graph — local nodes, ingested Evidence, ingested Claim, and the new
+Assumption — passes all nine SHACL shapes. The invariant cell below checks the
+architectural guarantees that made this possible.
+""")
+    return
+
+
+@app.cell(hide_code=True)
+def cell_29_invariants(
     mo,
     alice_dg,
     alice_D1,
@@ -697,6 +885,17 @@ def cell_26_invariants(
     Assumption,
 ):
     """Demonstrate all five architectural invariants with labelled assertions."""
+
+    mo.vstack([
+        mo.md("""
+The five invariants below are architectural guarantees — they hold for any valid
+export from any conforming `DiscourseGraph`, not just for this scenario.
+INV-P1 and INV-P2 together enforce the edge-bounding rule on every exported triple.
+INV-P3 enforces that policy RDF is structurally isolated from the knowledge store
+(structural enforcement, not convention). OP-1 and the Python subclass assertion
+connect the graph-level constraints back to the OWL axioms.
+"""),
+    ])
 
     # ── INV-P1 / INV-P2: edge-bounding over both exports ─────────────────────
     for _label, _exported, _permitted in [
@@ -767,10 +966,22 @@ def cell_26_invariants(
 # ── Act 5: Visualization ──────────────────────────────────────────────────────
 
 @app.cell(hide_code=True)
-def cell_27_visualize_sharing(mo, plt, alice_dg, bob_dg, alice_E1, alice_C1, visualize_sharing):
-    """Side-by-side visualization of Alice's and Bob's graphs post-sharing."""
-    mo.md("## Act 5 — Visualization")
+def cell_30_act5_narration(mo):
+    """Act 5 heading and narrative context."""
+    mo.vstack([
+        mo.md("## Act 5 — Visualization"),
+        mo.md("""
+The side-by-side view shows both graphs after the sharing event. Ingested nodes
+carry a dashed orange border. The dashed gray arrow from A1 to C1* shows the
+`prov:wasDerivedFrom` edge Bob added when he promoted C1 to an Assumption.
+"""),
+    ])
+    return
 
+
+@app.cell(hide_code=True)
+def cell_31_visualize_sharing(mo, plt, alice_dg, bob_dg, alice_E1, alice_C1, visualize_sharing):
+    """Side-by-side visualization of Alice's and Bob's graphs post-sharing."""
     _fig = visualize_sharing(alice_dg, bob_dg, [alice_E1, alice_C1])
     mo.vstack([
         mo.as_html(_fig),
@@ -784,7 +995,7 @@ def cell_27_visualize_sharing(mo, plt, alice_dg, bob_dg, alice_E1, alice_C1, vis
 
 
 @app.cell(hide_code=True)
-def cell_28_summary(mo):
+def cell_32_summary(mo):
     """Epistemic status table — all nodes in Bob's post-sharing graph."""
     mo.vstack([
         mo.md("## Epistemic Status — BobGroup Post-Sharing"),
@@ -806,9 +1017,11 @@ The system enforces the boundary — Bob cannot see E1 or E2 behind C1 — and t
 makes that boundary visible in the graph structure itself.
 """),
         mo.callout(mo.md(
-            "All assertions in this notebook correspond to architectural invariants documented "
-            "in `docs/REQUIREMENTS.md`. CP-4 is satisfied when `marimo run` completes "
-            "without errors and all assertions pass."
+            "The discourse-graph library makes epistemic boundaries first-class. Alice writes "
+            "Python; the library produces inspectable RDF and SPARQL. Bob's graph records not "
+            "just what he knows but how he knows it and what he chose to accept on trust. "
+            "The SHACL shapes enforce that these provenance annotations are always present — "
+            "no node can be silently ingested without attribution."
         ), kind="success"),
     ])
     return
