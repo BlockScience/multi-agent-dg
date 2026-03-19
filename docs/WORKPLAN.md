@@ -189,10 +189,10 @@ before any graph, policy, or ingest code is written.**
 ### Objectives
 
 - Implement Pydantic node models as the primary user API.
-- Implement `ValidationReport` as a Pydantic model (JSON-serializable).
-- Implement `Agent` dataclass with deterministic URI derivation.
+- Implement `VerificationReport` as a Pydantic model (JSON-serializable).
+- Implement `Agent` dataclass (aggregate actor — organisation/team, not individual) with deterministic URI derivation.
 - Verify Python-layer type hierarchy mirrors OWL subclass hierarchy.
-- Verify `to_triples()` round-trip (model → triples → SHACL validates).
+- Verify `to_triples()` round-trip (model → triples → SHACL verifies).
 
 ### Files to create, in order
 
@@ -201,7 +201,7 @@ before any graph, policy, or ingest code is written.**
 | 10 | `discourse_graph/models.py` | `DiscourseNode`, `Question`, `Claim`, `Evidence`, `Source`, `Decision`, `Assumption`; `NODE_TYPE_MAP`; `to_triples()` |
 | 11 | `tests/test_models.py` | FR-PYD-1 through FR-PYD-7 |
 | 12 | `discourse_graph/agent.py` | `Agent` dataclass with `uri`, `node_uri()`, `graph_uri()`, `policy_uri()` |
-| 13 | `discourse_graph/report.py` + `tests/test_agent.py` | `ValidationReport` Pydantic model; Agent URI derivation and isolation tests |
+| 13 | `discourse_graph/report.py` + `tests/test_agent.py` | `VerificationReport` Pydantic model; Agent URI derivation and isolation tests |
 
 Note: `report.py` is written here (step 13) because it has no dependency
 on `graph.py`. This avoids circular imports when `graph.py` imports both.
@@ -224,7 +224,7 @@ on `graph.py`. This avoids circular imports when `graph.py` imports both.
 | `test_fr_pyd_6_to_triples_decision` | FR-PYD-6 | `Decision.to_triples(uri)` includes `eng:decisionStatus` |
 | `test_fr_pyd_6_to_triples_assumption` | FR-PYD-6 | `Assumption.to_triples(uri)` includes `eng:assumptionScope` |
 | `test_fr_pyd_6_round_trip_shacl_all_types` | FR-PYD-6 | For each model type: instantiate → `to_triples()` → write to fresh `rdflib.Graph` → `pyshacl.validate` against shapes → `conforms=True` |
-| `test_fr_pyd_7_validation_report_json` | FR-PYD-7 | `ValidationReport` instance serializes to JSON without error |
+| `test_fr_pyd_7_verification_report_json` | FR-PYD-7 | `VerificationReport` instance serializes to JSON without error |
 | `test_assumption_cs1_inherited_via_shacl` | FR-SHACL-3 | Assumption without `dg:content` fails CS-1 via SHACL subclass inheritance |
 | `test_assumption_as1_scope_required` | FR-SHACL-9 | Assumption without `eng:assumptionScope` fails AS-1 |
 | `test_assumption_all_three_rdf_types` | FR-PYD-6 | `Assumption.to_triples()` includes `rdf:type eng:Assumption`, `rdf:type dg:Claim`, `rdf:type dg:DiscourseNode` |
@@ -255,11 +255,11 @@ Run `pytest tests/test_models.py tests/test_agent.py -v`.
 - [ ] `python -c "from discourse_graph.models import Assumption, Claim; a = Assumption(content='x', label='y', scope='z'); print(isinstance(a, Claim))"` prints `True`.
 - [ ] `python -c "from discourse_graph.models import Decision; Decision(content='x', label='y', status='cancelled')"` raises `pydantic.ValidationError`.
 - [ ] `Assumption.to_triples()` output includes all three `rdf:type` triples: `eng:Assumption`, `dg:Claim`, `dg:DiscourseNode`.
-- [ ] `ValidationReport` serializes to JSON (`.model_dump()` runs without error).
+- [ ] `VerificationReport` serializes to JSON (`.model_dump()` runs without error).
 
 ### Reference patterns — WP-2
 
-- **Pydantic for all structured data** (mtg-colors-personality-test/src): `ValidationReport`, `InferenceResult` are Pydantic models for JSON-serializability. Same pattern applies here.
+- **Pydantic for all structured data** (mtg-colors-personality-test/src): `VerificationReport`, `InferenceResult` are Pydantic models for JSON-serializability. Same pattern applies here.
 - **SHACL-before-write guard**: `verify_on_write=True` is a guard that gates write transitions — the Pydantic `ValidationError` is the Python-layer guard; SHACL is the RDF-layer guard. Neither replaces the other.
 - **Structured views as verification**: `to_triples()` makes the Pydantic-to-RDF round-trip testable. The SHACL round-trip test is the verification step.
 
@@ -294,6 +294,10 @@ visualization or notebook work begins. Most complex work package.**
 
 #### test_graph.py
 
+> **Change 2026-03-19:** Added two FR-DG-5 test rows pinning that
+> `_check_add_edge()` validates only `DISCOURSE_PREDICATES`; non-discourse
+> predicates are unconditionally accepted.
+
 | Test name | Req ID | Assertion |
 |---|---|---|
 | `test_fr_dg_1_store_is_conjunctive_graph` | FR-DG-1 | `type(dg._store).__name__ == "ConjunctiveGraph"` |
@@ -303,13 +307,15 @@ visualization or notebook work begins. Most complex work package.**
 | `test_fr_dg_4_add_node_empty_content_raises` | FR-DG-4 | `verify_on_write=True`: `add_node(..., content="", ...)` raises `ValueError` |
 | `test_fr_dg_5_add_edge_invalid_predicate_raises` | FR-DG-5 | `verify_on_write=True`: `add_edge(s, URIRef("bad:pred"), o)` raises `ValueError` |
 | `test_fr_dg_5_add_edge_domain_violation_raises` | FR-DG-5 | Edge with wrong subject type raises `ValueError` |
+| `test_fr_dg_5_non_discourse_predicate_accepted` | FR-DG-5 | `verify_on_write=True`: `add_edge(s, PROV.wasDerivedFrom, o)` does NOT raise |
+| `test_fr_dg_5_discourse_predicate_domain_violation_raises` | FR-DG-5 | `verify_on_write=True`: `add_edge(evidence_uri, DG.supports, question_uri)` raises `ValueError` (wrong domain) |
 | `test_fr_dg_6_unconditional_write` | FR-DG-6 | `verify_on_write=False`: malformed node writes without raising |
 | `test_fr_dg_7_relational_shacl_deferred` | FR-DG-7 | Adding `dg:Evidence` node without relations does not raise in `add_node`; violation appears in `verify()` |
 | `test_fr_dg_8_add_node_writes_required_triples` | FR-DG-8 | `add_node()` writes `rdf:type`, `rdf:type dg:DiscourseNode`, `rdf:type prov:Entity`, `dg:content`, `rdfs:label`, `dg:created` |
 | `test_fr_dg_8_add_primary_matches_add_node` | FR-DG-8 | `add(Question(...))` writes the same triples as `add_node(DG.Question, ...)` |
 | `test_fr_dg_9_add_node_default_graph` | FR-DG-9 | Without `graph_uri`, node written to `agent.graph_uri("local")` |
 | `test_fr_dg_10_add_edge_default_graph` | FR-DG-10 | Without `graph_uri`, edge written to `agent.graph_uri("local")` |
-| `test_fr_dg_11_verify_returns_report` | FR-DG-11 | `verify()` returns `ValidationReport` instance |
+| `test_fr_dg_11_verify_returns_report` | FR-DG-11 | `verify()` returns `VerificationReport` instance |
 | `test_fr_dg_11_verify_excludes_policy` | FR-DG-11 | Triples in `_policy` do not appear in the graph passed to `pyshacl.validate` |
 | `test_fr_dg_12_named_graphs` | FR-DG-12 | `named_graphs()` returns a list of `URIRef` values |
 | `test_fr_dg_13_triple_count` | FR-DG-13 | `triple_count()` returns correct count; `triple_count(graph_uri)` returns scoped count |
@@ -418,7 +424,7 @@ Add smoke tests (new file `tests/test_viz.py` or append to `test_graph.py`):
 
 Run `marimo run notebooks/discourse_graph_demo.py`.
 
-#### Act 1 (cells 0–5): Setup
+#### Act 1 (cells 1–5): Setup
 
 - [ ] Cell 0: Header renders. Layer table and two-policy summary visible.
 - [ ] Cell 1: Only `discourse_graph` imports visible. No `rdflib`, `pyshacl`, or SPARQL imports in the cell.
@@ -536,3 +542,12 @@ Run `marimo run notebooks/discourse_graph_demo.py`.
 | 20 | `tests/test_invariants.py` | WP-3 → **CP-3** |
 | 21 | `discourse_graph/viz.py` | WP-4 |
 | 22 | `notebooks/discourse_graph_demo.py` | WP-4 → **CP-4** |
+
+---
+
+## Change log
+
+| Date | What changed | Why / decision trigger |
+|---|---|---|
+| 2026-03-19 | Initial document created | Work package structure, collaboration model, QA checklists, and reference patterns established |
+| 2026-03-19 | Rename `ValidationReport` → `VerificationReport` throughout; clarify `Agent` as aggregate actor; test name `test_fr_pyd_7_validation_report_json` → `test_fr_pyd_7_verification_report_json`; CP-2 commit message updated | SHACL is deterministic machine-checked rule enforcement (verification); "validation" reserved for judgement-requiring checks. Agent is an organisation/team owning a locally consistent subgraph. |

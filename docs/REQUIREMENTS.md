@@ -77,7 +77,7 @@ overlapping discourse graphs for a lunar transfer stage propulsion trade study.
 | FR-PYD-4 | The raw `add_node(node_type, content, label)` method SHALL remain available for programmatic and test use but SHALL NOT be the recommended API for users. |
 | FR-PYD-5 | Pydantic validation SHALL run at Python call time (before any RDF is written). SHACL validation via `verify()` is a second independent layer over the serialized graph. Both layers enforcing the same constraints is intentional. |
 | FR-PYD-6 | A Pydantic model instance SHALL be serializable to a dict of RDF triple tuples via a `.to_triples(uri)` method, enabling round-trip testing between the Python and RDF representations. |
-| FR-PYD-7 | The `ValidationReport` returned by `verify()` SHALL be a Pydantic model, not a plain dataclass, so that it is serializable to JSON for logging and downstream tooling. |
+| FR-PYD-7 | The `VerificationReport` returned by `verify()` SHALL be a Pydantic model, not a plain dataclass, so that it is serializable to JSON for logging and downstream tooling. |
 
 
 
@@ -93,7 +93,7 @@ overlapping discourse graphs for a lunar transfer stage propulsion trade study.
 | FR-DG-8 | `add_node` SHALL mint a UUID-suffixed URI, write `rdf:type`, `rdf:type dg:DiscourseNode`, `rdf:type prov:Entity`, `dg:content`, `rdfs:label`, `dg:created` to the target named graph. |
 | FR-DG-9 | `add_node` SHALL accept an optional `graph_uri`; defaulting to `agent.graph_uri("local")`. |
 | FR-DG-10 | `add_edge` SHALL accept an optional `graph_uri`; defaulting to `agent.graph_uri("local")`. |
-| FR-DG-11 | `verify(graph_uri=None)` SHALL run full pyshacl validation against the named graph (or all of `_store` if `None`) and return a `ValidationReport`. `_policy` SHALL never be included. |
+| FR-DG-11 | `verify(graph_uri=None)` SHALL run full SHACL shape verification against the named graph (or all of `_store` if `None`) and return a `VerificationReport`. `_policy` SHALL never be included. |
 | FR-DG-12 | `named_graphs()` SHALL return the list of named graph URIs in `_store`. |
 | FR-DG-13 | `triple_count(graph_uri=None)` SHALL return triple count for the named graph or all of `_store`. |
 
@@ -179,3 +179,4 @@ Each is tested explicitly in the test suite and asserted in `export_policy`.
 | Date | What changed | Why / decision trigger |
 |---|---|---|
 | 2026-03-19 | Initial document created | Project scaffold — all requirement groups and INV-P1–INV-P5 established |
+| 2026-03-19 | Rename `ValidationReport` → `VerificationReport` in FR-PYD-7 and FR-DG-11; clarify `Agent` as aggregate actor | SHACL is deterministic machine-checked rule enforcement (verification); "validation" reserved for judgement-requiring checks. Agent is an organisation/team owning a locally consistent subgraph. |

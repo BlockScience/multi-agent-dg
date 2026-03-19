@@ -583,10 +583,16 @@ def add(
 
 ## 4. Agent (discourse_graph/agent.py)
 
+An `Agent` is an **aggregate actor** — an organisation, team, or working group
+— that owns a single `DiscourseGraph` instance.  That instance is a locally
+consistent subgraph of a larger distributed graph that no single agent
+possesses in full.  The `name` field identifies the owning group (e.g.
+`"AliceGroup"`, `"PropulsionTeam"`), not an individual person.
+
 ```python
 @dataclass
 class Agent:
-    name: str         # human-readable e.g. "AliceGroup"
+    name: str         # owning group e.g. "AliceGroup" — not an individual
     namespace: str    # base IRI, must end with "/"
                       # e.g. "http://example.org/alice/"
 
@@ -606,10 +612,14 @@ class Agent:
 
 ---
 
-## 5. ValidationReport (discourse_graph/report.py)
+## 5. VerificationReport (discourse_graph/report.py)
+
+SHACL enforces deterministic, machine-checked constraints — that is
+*verification*, not validation.  Validation is reserved for assessments that
+require human judgement or domain expertise outside the software.
 
 ```python
-class ValidationReport:
+class VerificationReport:
     conforms:      bool
     report_text:   str           # raw pyshacl text output
     results_graph: rdflib.Graph  # sh:ValidationResult nodes
@@ -724,8 +734,11 @@ def add_edge(
     """
     Add a typed edge between two discourse nodes.
 
-    verify_on_write=True: raises ValueError on invalid predicate,
-    domain or range mismatch.
+    verify_on_write=True: validates only predicates in DISCOURSE_PREDICATES
+    (domain/range check). Non-discourse predicates (e.g. prov:wasDerivedFrom,
+    prov:wasAttributedTo) are always accepted without validation.
+    # CHANGE 2026-03-19: clarified that _check_add_edge validates DISCOURSE_PREDICATES only.
+    # Non-discourse predicates (prov:*, rdfs:*, etc.) are unconditionally accepted.
     """
 ```
 
@@ -735,9 +748,9 @@ def add_edge(
 def verify(
     self,
     graph_uri: Optional[URIRef] = None,
-) -> ValidationReport:
+) -> VerificationReport:
     """
-    Full SHACL validation.
+    Full SHACL shape verification.
     graph_uri=None → union of all named graphs in _store.
     _policy is NEVER included.
     """
@@ -815,7 +828,9 @@ def _now(self) -> Literal          # xsd:dateTime
 def _get_concrete_type(self, node_uri: URIRef) -> Optional[URIRef]
 def _flat_graph(self, graph_uri: Optional[URIRef] = None) -> Graph
 def _check_add_node(self, node_type, content, label) -> None
+# CHANGE 2026-03-19: added predicate-scope constraint for _check_add_edge.
 def _check_add_edge(self, subject, predicate, obj) -> None
+    # Only validates predicates in DISCOURSE_PREDICATES; non-discourse predicates are a no-op.
 def _compile_policy(self, policy_uri: URIRef) -> tuple[str, frozenset[URIRef]]
 ```
 
@@ -898,7 +913,7 @@ as a directed graph from Q1 through D1 to Q2.
 | Cell | Act | Title | Content |
 |---|---|---|---|
 | 0 | — | Header | `mo.md(...)` — title, domain, layer table, two-policy summary |
-| 1 | 1 | Imports | `from discourse_graph import ...` — no RDF imports visible |
+| 1 | 1 | Imports | `from discourse_graph import ..., DISCOURSE_PREDICATES` — no RDF imports visible |
 | 2 | 1 | Ontology | `load_dg_ontology()`, `load_eng_ontology()` — print triple counts |
 | 3 | 1 | SHACL shapes | `load_shapes()` — print shape names and req IDs |
 | 4 | 1 | Agents | Construct `alice_agent`, `bob_agent` — print namespaces |
@@ -909,18 +924,18 @@ as a directed graph from Q1 through D1 to Q2.
 | 9 | 2 | Populate Bob | `add()` × 4, `add_edge()` × 3 — print node URIs |
 | 10 | 2 | Validate Bob | `bob_dg.verify()` — print report, assert conforms |
 | 11 | 2 | Visualize Bob | `visualize_graph(bob_dg)` — pre-sharing state |
-| 12 | 3 | Policy A declared | `declare_sharing_policy("evidence-sharing", ...)` — print URI |
+| 12 | 3 | Policy A declared | `policy_A_uri = alice_dg.declare_sharing_policy("evidence-sharing", ...)` — print URI; returns `policy_A_uri` |
 | 13 | 3 | Policy A RDF | Print `alice_dg._policy` serialised as Turtle — lift the hood |
-| 14 | 3 | Policy A SPARQL | Print compiled SPARQL from `_compile_policy` — lift the hood |
-| 15 | 3 | Policy B declared | `declare_sharing_policy("arch-claim", ...)` — print URI |
+| 14 | 3 | Policy A SPARQL | `sparql_A, permitted_A = alice_dg._compile_policy(policy_A_uri)` — print SPARQL string; returns `(sparql_A, permitted_A)` |
+| 15 | 3 | Policy B declared | `policy_B_uri = alice_dg.declare_sharing_policy("arch-claim", ...)` — print URI; returns `policy_B_uri` |
 | 16 | 3 | Policy B RDF | Print updated `alice_dg._policy` Turtle — show second policy added |
-| 17 | 3 | Policy B SPARQL | Print compiled SPARQL for Policy B — contrast with Policy A |
-| 18 | 4 | Push Policy A | `exported_A, _ = alice_dg.export_policy("evidence-sharing", bob.uri)` |
+| 17 | 3 | Policy B SPARQL | `sparql_B, permitted_B = alice_dg._compile_policy(policy_B_uri)` — print SPARQL string; returns `(sparql_B, permitted_B)` |
+| 18 | 4 | Push Policy A | `exported_A, _ = alice_dg.export_policy("evidence-sharing", bob_agent.uri)` |
 | 19 | 4 | Bob ingests A | `bob_dg.ingest(exported_A, alice_agent.uri)` — E1 arrives as Evidence |
-| 20 | 4 | Bob uses E1 | `bob_dg.add_edge(e1_ingested, DG.informs, bob_Q2)` |
-| 21 | 4 | Push Policy B | `exported_B, _ = alice_dg.export_policy("arch-claim", bob.uri)` |
+| 20 | 4 | Bob uses E1 | `e1_ingested = alice_E1` (ingested nodes retain their original URI — no new URI is minted); `bob_dg.add_edge(e1_ingested, DG.informs, bob_Q2)` |
+| 21 | 4 | Push Policy B | `exported_B, _ = alice_dg.export_policy("arch-claim", bob_agent.uri)` |
 | 22 | 4 | Bob ingests B | `bob_dg.ingest(exported_B, alice_agent.uri)` — C1 arrives, no backing |
-| 23 | 4 | Bob promotes C1 | `bob_dg.add(Assumption(..., scope="Phase A trade study"))` with `prov:wasDerivedFrom` alice_C1 |
+| 23 | 4 | Bob promotes C1 | `bob_A1 = bob_dg.add(Assumption(..., scope="Phase A trade study"))` then `bob_dg.add_edge(bob_A1, PROV.wasDerivedFrom, alice_C1)` and `bob_dg.add_edge(bob_A1, PROV.wasAttributedTo, alice_agent.uri)` |
 | 24 | 4 | Bob's Decision | `bob_dg.add_edge(bob_D2, ENG.justification, bob_A1)` — grounds D2 in Assumption |
 | 25 | 4 | Validate Bob | `bob_dg.verify()` — assert AS-1 and IS-1 both pass |
 | 26 | 4 | Invariant check | Print INV-P1/P2/P3 for both exports, labeled clearly |
@@ -992,8 +1007,13 @@ Bob creates a new local Assumption derived from the ingested C1:
 
 | ID | Type | Label | Content | Edges |
 |---|---|---|---|---|
-| A1 | `eng:Assumption` | A1-BipropAccepted | Bipropellant architecture accepted from AliceGroup systems architecture analysis. Evidence chain not available in this graph. | `prov:wasDerivedFrom` C1\*, `prov:wasAttributedTo` alice:agent |
+| A1 | `eng:Assumption` | A1-BipropAccepted | Bipropellant architecture accepted from AliceGroup systems architecture analysis. Evidence chain not available in this graph. | *(see note)* |
 | — | — | — | scope: "Lunar transfer stage Phase A propulsion subsystem trade study" | — |
+
+> **Note:** `prov:wasDerivedFrom` and `prov:wasAttributedTo` are object properties
+> (edges), not Pydantic model fields. They are added via `add_edge()` after `add()`:
+> `bob_dg.add_edge(bob_A1, PROV.wasDerivedFrom, alice_C1)` and
+> `bob_dg.add_edge(bob_A1, PROV.wasAttributedTo, alice_agent.uri)`.
 
 Bob then adds `eng:justification` D2→A1. D2 is now grounded in:
 - C3 (Bob's own Claim)
@@ -1155,4 +1175,5 @@ independent of the demo domain content.
 | Date | What changed | Why / decision trigger |
 |---|---|---|
 | 2026-03-19 | Initial document created | Project scaffold — ontology, SHACL, class APIs, notebook spec, domain content established |
+| 2026-03-19 | Rename `ValidationReport` → `VerificationReport`; clarify `Agent` as aggregate actor | SHACL is deterministic machine-checked rule enforcement (verification); "validation" reserved for judgement-requiring checks. Agent is an organisation/team owning a locally consistent subgraph, not an individual. |
 
