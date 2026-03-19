@@ -1,6 +1,7 @@
 # discourse_graph/__init__.py
 # Public re-exports for the discourse-graph package.
 from discourse_graph.agent import Agent
+from discourse_graph.graph import DiscourseGraph
 from discourse_graph.models import (
     Assumption,
     Claim,
@@ -16,6 +17,7 @@ from discourse_graph.report import VerificationReport
 __all__ = [
     "Agent",
     "Assumption",
+    "DiscourseGraph",
     "Claim",
     "Decision",
     "DiscourseNode",
