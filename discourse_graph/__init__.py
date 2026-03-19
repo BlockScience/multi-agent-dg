@@ -20,6 +20,7 @@ from discourse_graph.io import (
     load_policy,
     save_policy_sparql,
 )
+from discourse_graph.viz import visualize_graph, visualize_sharing
 
 __all__ = [
     "Agent",
@@ -38,4 +39,6 @@ __all__ = [
     "save_policy",
     "load_policy",
     "save_policy_sparql",
+    "visualize_graph",
+    "visualize_sharing",
 ]

@@ -148,3 +148,48 @@ def test_is1_passes_after_ingest(
     assert "IS-1" not in report.violation_ids(), (
         f"IS-1 violated after ingest. Report:\n{report.summary()}"
     )
+
+
+# ── Idempotency: double-ingest of same subgraph ───────────────────────────────
+
+
+def test_ingest_idempotent_provenance(
+    bob_dg: DiscourseGraph, alice_subgraph: Graph, alice_agent: Agent, e1_uri: URIRef
+) -> None:
+    """Idempotency: ingest() twice must not create duplicate dg:ingestedAt triples."""
+    ingested_uri = bob_dg.ingest(alice_subgraph, alice_agent.uri)
+    bob_dg.ingest(alice_subgraph, alice_agent.uri)  # second call — same subgraph
+
+    ingested_ctx = bob_dg._store.get_context(ingested_uri)
+    ingested_at_vals = list(ingested_ctx.objects(e1_uri, DG.ingestedAt))
+    assert len(ingested_at_vals) == 1, (
+        f"Expected exactly 1 dg:ingestedAt triple after double ingest; got {len(ingested_at_vals)}"
+    )
+
+
+def test_ingest_idempotent_verify(
+    bob_dg: DiscourseGraph, alice_subgraph: Graph, alice_agent: Agent
+) -> None:
+    """Idempotency: IS-1 must not appear after double ingest (provenance not duplicated)."""
+    ingested_uri = bob_dg.ingest(alice_subgraph, alice_agent.uri)
+    bob_dg.ingest(alice_subgraph, alice_agent.uri)
+
+    report = bob_dg.verify(ingested_uri)
+    assert "IS-1" not in report.violation_ids(), (
+        f"IS-1 violated after double ingest:\n{report.summary()}"
+    )
+
+
+def test_ingest_idempotent_triple_count(
+    bob_dg: DiscourseGraph, alice_subgraph: Graph, alice_agent: Agent
+) -> None:
+    """Idempotency: triple count must be identical after single and double ingest."""
+    ingested_uri = bob_dg.ingest(alice_subgraph, alice_agent.uri)
+    count_after_first = bob_dg.triple_count(ingested_uri)
+
+    bob_dg.ingest(alice_subgraph, alice_agent.uri)
+    count_after_second = bob_dg.triple_count(ingested_uri)
+
+    assert count_after_first == count_after_second, (
+        f"Triple count changed after double ingest: {count_after_first} → {count_after_second}"
+    )

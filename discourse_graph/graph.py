@@ -678,6 +678,10 @@ class DiscourseGraph:
         }
         now = self._now()
         for node_uri in discourse_nodes:
+            # Idempotency guard: skip provenance if node already marked IngestedNode.
+            # Without this, repeated ingest() calls produce multiple dg:ingestedAt triples.
+            if any(ctx.triples((node_uri, RDF.type, DG.IngestedNode))):
+                continue
             ctx.add((node_uri, RDF.type, DG.IngestedNode))              # INV-P3: _policy never enters _store
             ctx.add((node_uri, PROV.wasAttributedTo, source_agent_uri)) # INV-P3: _policy never enters _store
             ctx.add((node_uri, DG.ingestedAt, now))                     # INV-P3: _policy never enters _store
