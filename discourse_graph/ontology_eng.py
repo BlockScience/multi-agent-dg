@@ -89,6 +89,19 @@ eng:justification a owl:ObjectProperty ;
         Replaces the non-conformant dg:cites predicate.
     \"\"\" .
 
+eng:option a owl:ObjectProperty ;
+    rdfs:domain dg:Claim ;
+    rdfs:range  dg:Question ;
+    rdfs:label  "option" ;
+    rdfs:comment \"\"\"
+        dg:Claim eng:option dg:Question
+        Links a Claim representing a candidate solution to the design
+        Question it addresses. Used in alternatives analysis to make
+        the option set explicit: each viable and non-viable candidate
+        is connected to the question it proposes to answer.
+    \"\"\" ;
+    rdfs:isDefinedBy eng: .
+
 # ── Assumption class ──────────────────────────────────────────────────────────
 
 eng:Assumption a owl:Class ;

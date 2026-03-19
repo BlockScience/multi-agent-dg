@@ -41,6 +41,7 @@ overlapping discourse graphs for a lunar transfer stage propulsion trade study.
 | FR-ONT-ENG-7 | The `eng:` ontology SHALL declare `eng:assumptionScope` as a datatype property (xsd:string) with domain `eng:Assumption`. |
 | FR-ONT-ENG-8 | The `eng:` ontology SHALL declare `eng:decisionStatus` as a datatype property (xsd:string) on `eng:Decision`. |
 | FR-ONT-ENG-9 | The `eng:` namespace stub SHALL carry the same production replacement notice as `dg:`. |
+| FR-ONT-ENG-10 | The `eng:` ontology SHALL declare `eng:option` as `owl:ObjectProperty` with `rdfs:domain dg:Claim` and `rdfs:range dg:Question`, linking a candidate Claim to the design Question it addresses. |
 
 ### FR-SHACL — Validation shapes
 
@@ -180,3 +181,4 @@ Each is tested explicitly in the test suite and asserted in `export_policy`.
 |---|---|---|
 | 2026-03-19 | Initial document created | Project scaffold — all requirement groups and INV-P1–INV-P5 established |
 | 2026-03-19 | Rename `ValidationReport` → `VerificationReport` in FR-PYD-7 and FR-DG-11; clarify `Agent` as aggregate actor | SHACL is deterministic machine-checked rule enforcement (verification); "validation" reserved for judgement-requiring checks. Agent is an organisation/team owning a locally consistent subgraph. |
+| 2026-03-19 | Added FR-ONT-ENG-10: `eng:option` predicate (domain `dg:Claim`, range `dg:Question`) | Needed to link candidate Claims to the design Question they address in alternatives analysis; makes the option set explicit in the graph |

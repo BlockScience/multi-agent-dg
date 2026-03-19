@@ -140,7 +140,8 @@ before any models or graph code is written.**
 | `test_fr_ont_eng_7_assumption_scope_property` | FR-ONT-ENG-7 | `eng:assumptionScope` declared as `owl:DatatypeProperty`, range `xsd:string` |
 | `test_fr_ont_eng_8_decision_status_property` | FR-ONT-ENG-8 | `eng:decisionStatus` declared as `owl:DatatypeProperty` on `eng:Decision` |
 | `test_fr_ont_eng_9_namespace_stub_comment` | FR-ONT-ENG-9 | Source file contains the namespace stub replacement notice |
-| `test_seam_dg_question_only_shared` | ARCH | `dg:Question` is the only `dg:` term referenced by `eng:`; no `eng:Claim`, `eng:Evidence`, etc. |
+| `test_fr_ont_eng_10_option_predicate` | FR-ONT-ENG-10 | `eng:option` has domain `dg:Claim`, range `dg:Question` |
+| `test_seam_dg_question_only_shared` | ARCH | `eng:` must not re-declare `dg:` node classes; cross-namespace references (dg:Claim as domain) are permitted |
 
 #### test_shacl.py
 
@@ -435,7 +436,7 @@ Run `marimo run notebooks/discourse_graph_demo.py`.
 
 #### Act 2 (cells 6–11): Individual graphs
 
-- [ ] Cell 6: Alice's 6 nodes added via `add()` (not `add_node()`); 7 edges added.
+- [ ] Cell 6: Alice's 6 nodes added via `add()` (not `add_node()`); 10 edges added.
   - Q1 "What propulsion architecture minimises total system mass?"
   - C1 "Chemical bipropellant (MMH/NTO) is baseline"
   - C2 "Solar electric propulsion not viable (schedule constraint)"
@@ -551,3 +552,4 @@ Run `marimo run notebooks/discourse_graph_demo.py`.
 |---|---|---|
 | 2026-03-19 | Initial document created | Work package structure, collaboration model, QA checklists, and reference patterns established |
 | 2026-03-19 | Rename `ValidationReport` → `VerificationReport` throughout; clarify `Agent` as aggregate actor; test name `test_fr_pyd_7_validation_report_json` → `test_fr_pyd_7_verification_report_json`; CP-2 commit message updated | SHACL is deterministic machine-checked rule enforcement (verification); "validation" reserved for judgement-requiring checks. Agent is an organisation/team owning a locally consistent subgraph. |
+| 2026-03-19 | Added FR-ONT-ENG-10 (`eng:option`) to WP-3 test table; WP-4 cell 6 edge count 8 → 10 | `eng:option` predicate added to make candidate options explicit in alternatives analysis |

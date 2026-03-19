@@ -243,6 +243,7 @@ def visualize_graph(
         G, pos,
         edge_labels=edge_labels,
         font_size=_EDGE_LABEL_FONT_SIZE,
+        bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.75),
         ax=ax,
     )
 

@@ -197,6 +197,19 @@ eng:justification a owl:ObjectProperty ;
         Replaces the non-conformant dg:cites predicate.
     """ .
 
+eng:option a owl:ObjectProperty ;
+    rdfs:domain dg:Claim ;
+    rdfs:range  dg:Question ;
+    rdfs:label  "option" ;
+    rdfs:comment """
+        dg:Claim eng:option dg:Question
+        Links a Claim representing a candidate solution to the design
+        Question it addresses. Used in alternatives analysis to make
+        the option set explicit: each viable and non-viable candidate
+        is connected to the question it proposes to answer.
+    """ ;
+    rdfs:isDefinedBy eng: .
+
 # ── Assumption class ──────────────────────────────────────────────────────────
 
 eng:Assumption a owl:Class ;
@@ -956,7 +969,7 @@ cell.
 | 3 | 1 | SHACL shapes | `load_shapes()` — print shape names and req IDs |
 | 4 | 1 | Agents | Construct `alice_agent`, `bob_agent` — print namespaces |
 | 5 | 1 | DiscourseGraphs | `alice_dg` (verify_on_write=False), `bob_dg` (verify_on_write=True) |
-| 6 | 2 | Populate Alice | `add()` × 6, `add_edge()` × 7 — print node URIs and labels |
+| 6 | 2 | Populate Alice | `add()` × 6, `add_edge()` × 10 — print node URIs and labels |
 | 7 | 2 | Validate Alice | `alice_dg.verify()` — print report, assert conforms |
 | 8 | 2 | Visualize Alice | `visualize_graph(alice_dg)` — full graph including D1, eng:opens |
 | 9 | 2 | Populate Bob | `add()` × 4, `add_edge()` × 3 — print node URIs |
@@ -987,11 +1000,11 @@ cell.
 | ID | Type | Label | Content | Edges |
 |---|---|---|---|---|
 | Q1 | `dg:Question` | Q1-PropArch | What propulsion architecture minimises total system mass for the lunar transfer stage? | — |
-| C1 | `dg:Claim` | C1-ChemBiprop | Chemical bipropellant (MMH/NTO) is the baseline propulsion architecture. | — |
-| C2 | `dg:Claim` | C2-SEPNotViable | Solar electric propulsion is not viable within the 6-day transit schedule constraint. | — |
+| C1 | `dg:Claim` | C1-ChemBiprop | Chemical bipropellant (MMH/NTO) is the baseline propulsion architecture. | `eng:option` Q1 |
+| C2 | `dg:Claim` | C2-SEPNotViable | Solar electric propulsion is not viable within the 6-day transit schedule constraint. | `eng:option` Q1 |
 | E1 | `dg:Evidence` | E1-DeltaV | Delta-V budget analysis: 3.2 km/s total ΔV required for trans-lunar injection plus lunar orbit insertion. | `dg:supports` C1, `dg:informs` Q1 |
 | E2 | `dg:Evidence` | E2-Schedule | Schedule constraint analysis: SEP spiral transfer requires >90 days; mission requirement is ≤6 days. | `dg:supports` C2 |
-| D1 | `eng:Decision` | D1-SelectBiprop | Select MMH/NTO bipropellant architecture for lunar transfer stage propulsion. | `eng:decision` Q1, `eng:justification` C1, `eng:justification` E1, `eng:opens` Q2\* |
+| D1 | `eng:Decision` | D1-SelectBiprop | Select MMH/NTO bipropellant architecture for lunar transfer stage propulsion. | `eng:decision` Q1, `eng:justification` C1, `eng:justification` E1, `eng:justification` C2, `eng:opens` Q2\* |
 
 \* `eng:opens` Q2 is added after Q2 exists in AliceGroup's graph. In the demo
 Alice adds Q2 as a locally tracked downstream question before declaring
@@ -1214,4 +1227,5 @@ independent of the demo domain content.
 |---|---|---|
 | 2026-03-19 | Initial document created | Project scaffold — ontology, SHACL, class APIs, notebook spec, domain content established |
 | 2026-03-19 | Rename `ValidationReport` → `VerificationReport`; clarify `Agent` as aggregate actor | SHACL is deterministic machine-checked rule enforcement (verification); "validation" reserved for judgement-requiring checks. Agent is an organisation/team owning a locally consistent subgraph, not an individual. |
+| 2026-03-19 | Added `eng:option` predicate (domain `dg:Claim`, range `dg:Question`) to ENG Turtle in §4; updated C1/C2 edges in §8 domain content table; cell 6 count 8 → 10 | Makes the candidate option set explicit in alternatives analysis — C1 and C2 are registered as options for Q1 |
 

@@ -73,6 +73,8 @@ def cell_1_header(mo):
     """BLUF hook, title card, and five-act outline."""
     mo.vstack([
         mo.md(r"""
+# Discourse Graph — Policy-Controlled Multi-Agent Knowledge Sharing
+
 **Knowledge sharing across agents is only meaningful if the epistemic
 provenance of each shared item is preserved and legible.**
 
@@ -102,25 +104,89 @@ workflows.
 
 ---
 
-# Discourse Graph — Policy-Controlled Multi-Agent Knowledge Sharing
-
+## Cross-Team Engineering Design Decision Example
+              
 **Domain:** Lunar transfer stage propulsion trade study
 **Agents:** AliceGroup (systems architecture) · BobGroup (propulsion subsystem)
 
+The `dg:` ontology implements the discoursegraphs.com base grammar — it defines
+Question, Claim, Evidence, and Source as node types, and the predicates that
+connect them (supports, opposes, answers, informs). It is intentionally minimal
+and domain-neutral: any field that reasons in argument form can use it as-is.
+
+Engineering decisions, however, require something more opinionated. When a team
+commits to a design choice — selecting a propulsion architecture, closing a
+trade study — the reasoning structure differs from a Claim: a Decision resolves
+a Question, is justified by Claims and Evidence, and can open downstream
+Questions for other teams. The `eng:` extension ontology adds exactly these
+concepts (`eng:Decision`, `eng:Assumption`, and their predicates) as subclasses
+and sub-properties of `dg:` types. It imports `dg:` and adds to it; it does not
+redefine or conflict with anything in the base grammar.
+
+The two namespaces reflect a deliberate separation of concerns: `dg:` is stable
+and shared across communities; `eng:` is domain-specific and can evolve
+independently. Other domains can define their own extensions in the same pattern
+without touching the base.
+
 ---
 
-## Layer stack
+## Technology stack
 
-| Layer | Technology | Purpose |
+Each layer was chosen to keep formal rigour internal while exposing a
+Python-native interface. A developer authoring a node or declaring a policy
+never touches RDF syntax, SPARQL, or OWL directly — those are implementation
+details. A developer integrating the library into a data pipeline works with
+typed Pydantic models, standard Python dataclasses, and ordinary method calls.
+
+**OWL 2 DL** gives the ontology decidable reasoning semantics and a
+well-defined class hierarchy. We use it to express what kinds of things exist
+in a discourse graph and how they relate — not at runtime, but as a
+machine-checkable specification that SHACL shapes and the Python models are
+both derived from.
+
+**SHACL** enforces structural constraints on the serialized RDF graph. It
+catches things Pydantic cannot: relational invariants that only make sense once
+edges exist (e.g. an Evidence node must support or inform at least one other
+node). Running SHACL via `verify()` is explicit and may be deferred — it does not
+slow down every write.
+
+**Pydantic + rdflib** is the runtime pairing. Pydantic provides the
+user-facing API: typed constructors, field validation at the call site, and
+IDE autocompletion. rdflib provides the underlying RDF store and the named
+graph isolation that makes the policy mechanism possible. Neither is visible
+to a user who only calls `add()` and `add_edge()`.
+
+**RDF + SPARQL** for policy is the key architectural choice. Sharing policies
+are stored as first-class RDF individuals — they are inspectable, serializable,
+and auditable. At export time a policy is compiled to a SPARQL CONSTRUCT query.
+Alice never writes SPARQL; the library produces it from the RDF. The query is
+printed in Act 3 so the audience can verify that the boundary they specified
+in Python is exactly the boundary being enforced.
+
+**NetworkX + Matplotlib** handle visualization and graph analysis.
+NetworkX is the natural bridge between the RDF store and the broader scientific
+Python ecosystem: the discourse graph can be projected into a NetworkX DiGraph
+for layout, centrality analysis, path queries, or export to any tool that
+speaks NetworkX. Matplotlib renders the result. A developer who wants to run
+graph algorithms on a discourse graph does not need to learn SPARQL — they
+project to NetworkX and use the tools they already know.
+
+| Concern | Technology | Purpose |
 |-------|-----------|---------|
 | Ontology | OWL 2 DL (`dg:` + `eng:`) | Class hierarchy and predicate semantics |
 | Shapes | SHACL | Structural and relational constraints |
 | Runtime | Pydantic + rdflib | Write-time validation and RDF storage |
 | Policy | RDF + SPARQL | Formal, inspectable sharing rules |
+| Visualization & analysis | NetworkX + Matplotlib | Graph layout, algorithms, and rendering |
 
 ---
 
 ## Five-act narrative
+
+The notebook builds up the demonstration in stages. Acts 1 and 2 establish the
+graphs independently so the sharing event in Acts 4 and 5 has something
+meaningful to work with. Act 3 is the pedagogical core — we peak under the hood at the RDF and
+SPARQL artifacts that Alice's Python calls produce before any data moves.
 
 | Act | Cells | Topic |
 |-----|-------|-------|
@@ -133,6 +199,10 @@ workflows.
 ---
 
 ## Two sharing policies
+
+The contrast between the two policies is the central argument of the notebook.
+Same source graph, same grantee, different permitted sets — different epistemic
+objects arrive in Bob's graph, and he must handle them differently.
 
 | Policy | Permitted set | Epistemic character |
 |--------|--------------|---------------------|
@@ -202,15 +272,40 @@ def cell_3_shapes(mo, load_shapes):
 | OP-1 | eng:opens and eng:decision targets must be disjoint per Decision |
 """
     mo.vstack([
-        mo.md(f"**Shapes loaded:** {len(shapes)} triples"),
+        mo.md(f"**SHACL shapes loaded:** {len(shapes)} triples"),
+        mo.md("""
+SHACL shapes are the machine-checkable contract for graph structure. Where the
+OWL ontology defines *what things are*, SHACL defines *what a well-formed graph
+looks like* — which properties are required, which relationships must exist,
+and which combinations are forbidden. Every shape maps to a named requirement
+in the specification and is checked by calling `verify()` on a `DiscourseGraph`.
+
+The shapes fall into three groups:
+
+**Node completeness** (QS-1, CS-1, ES-1, SS-1, AS-1) — every node of a given
+type must carry the minimum set of properties (`dg:content`, `rdfs:label`,
+and type-specific fields like `eng:assumptionScope`). These are the constraints
+Pydantic also enforces at authoring time; SHACL re-checks them on the serialized
+graph as a second line of defence.
+
+**Relational integrity** (ES-2, DS-1, OP-1) — constraints that can only be
+checked once edges exist. An Evidence node must support, oppose, or inform at
+least one other node. A Decision must have at least one `eng:decision` and one
+`eng:justification` edge. The targets of `eng:opens` and `eng:decision` on the
+same Decision must be disjoint. Pydantic cannot enforce these alone — they require
+graph context so calls must be passed to SHACL for validation.
+
+**Provenance** (IS-1) — every node tagged `dg:IngestedNode` must carry a
+`prov:wasAttributedTo` triple. This ensures that cross-agent knowledge transfer
+is always attributed, regardless of how the ingest was performed.
+"""),
         mo.md(_shape_table),
         mo.callout(
             mo.md(
-                "SHACL and Pydantic serve different roles: Pydantic validates the model instance "
-                "at Python call time; SHACL validates the serialized RDF graph after triples are "
-                "written. Both are required — some constraints (such as ES-2's requirement that "
-                "Evidence must support or inform at least one node) can only be checked once the "
-                "edges exist in the graph."
+                "Pydantic validates the model instance at Python call time; SHACL validates "
+                "the serialized RDF graph after triples are written. Neither is redundant — "
+                "Pydantic catches errors at the call site with a readable traceback; SHACL "
+                "catches relational violations that only become visible once the graph is populated."
             ),
             kind="info",
         ),
@@ -236,6 +331,20 @@ def cell_4_agents(mo, Agent):
             ),
             kind="info",
         ),
+        mo.callout(
+            mo.md(
+                "**Namespace stub notice.** The IRIs shown above use the W3C example domain "
+                "`http://example.org/` and are placeholders for this demonstration. In a "
+                "production deployment, each agent's base IRI must be replaced with a "
+                "firm-controlled, dereferenceable URI — one that the owning organisation "
+                "hosts and maintains. Dereferenceability matters: other agents use these IRIs "
+                "as persistent identifiers for nodes and provenance records, and a URI that "
+                "cannot be resolved undermines the auditability of the graph. Replace "
+                "`http://example.org/alice/` and `http://example.org/bob/` with IRIs under "
+                "domains you control before any cross-team or cross-organisation sharing."
+            ),
+            kind="warn",
+        ),
     ])
     return (alice_agent, bob_agent)
 
@@ -246,21 +355,62 @@ def cell_5_discourse_graphs(mo, DiscourseGraph, alice_agent, bob_agent, ontology
     alice_dg = DiscourseGraph(alice_agent, ontology, shapes, verify_on_write=False)
     bob_dg   = DiscourseGraph(bob_agent,   ontology, shapes, verify_on_write=True)
     mo.vstack([
-        mo.md("**DiscourseGraph instances created:**"),
+        mo.md(r"""
+### `DiscourseGraph` — the primary runtime object
+
+`DiscourseGraph(agent, ontology, shapes, verify_on_write=False)`
+
+Each instance owns one agent's complete knowledge state: their nodes, their
+discourse edges, and their sharing policies. The internal layout keeps these
+concerns structurally separated:
+
+```
+DiscourseGraph
+├── _store: ConjunctiveGraph      ← all queryable data
+│   ├── graph/local               ← agent's own nodes and edges
+│   └── graph/ingested-{slug}     ← nodes received from other agents
+└── _policy: Graph                ← sharing policy RDF (never enters _store)
+```
+
+**Write API** — the only methods a content author needs:
+
+| Method | Description |
+|--------|-------------|
+| `add(node)` | Add a Pydantic node model; returns the minted URI |
+| `add_edge(s, p, o)` | Add a directed edge between two node URIs |
+
+**Validation:**
+
+| Method | Description |
+|--------|-------------|
+| `verify()` | Run full SHACL verification; returns `VerificationReport` |
+
+**Policy and sharing:**
+
+| Method | Description |
+|--------|-------------|
+| `declare_sharing_policy(name, grantee, source_graph, ...)` | Write a named policy to `_policy`; returns policy URI |
+| `export_policy(name, grantee_uri)` | Compile policy to SPARQL, execute, assert invariants; returns `(Graph, sparql_str)` |
+| `ingest(subgraph, source_agent_uri)` | Copy a received subgraph into a new named graph with provenance |
+| `pull_from(other, policy_name)` | Bob-side shortcut: calls `other.export_policy()` then `self.ingest()` |
+
+**Analysis and introspection:**
+
+| Method | Description |
+|--------|-------------|
+| `nodes(type_uri, graph_uri)` | List all discourse node URIs, optionally filtered by type or graph |
+| `node_data(node_uri)` | Return a plain dict of metadata for one node |
+| `discourse_edges(predicate, graph_uri)` | List all edges whose predicate is in `DISCOURSE_PREDICATES` |
+| `neighbors(node_uri)` | Return outgoing and incoming discourse edges for one node |
+| `named_graphs()` | List all named graph URIs in `_store` |
+| `triple_count(graph_uri)` | Count triples, optionally scoped to one named graph |
+"""),
         mo.callout(
             mo.md(
                 "Alice: `verify_on_write=False` — structural checks deferred to `verify()`. "
-                "Bob: `verify_on_write=True` — domain/range validated at every `add_edge()` call."
-            ),
-            kind="info",
-        ),
-        mo.callout(
-            mo.md(
-                "A `DiscourseGraph` holds a ConjunctiveGraph (`_store`) for typed node triples "
-                "and discourse edges, a structurally isolated `_policy` Graph for sharing policy "
-                "RDF, and references to the ontology and shapes for on-demand SHACL validation. "
-                "The `_policy` graph is never merged into `_store` — this structural isolation "
-                "is how INV-P3 is enforced."
+                "Bob: `verify_on_write=True` — domain/range validated at every `add_edge()` call. "
+                "The policy graph `_policy` is never merged into `_store` — this structural "
+                "isolation is the enforcement mechanism for INV-P3."
             ),
             kind="info",
         ),
@@ -274,7 +424,7 @@ def cell_5_discourse_graphs(mo, DiscourseGraph, alice_agent, bob_agent, ontology
 def cell_5b_what_next(mo):
     """Bridge narration: what Act 2 is about to do and why."""
     mo.md("""
-Both agents have empty discourse graphs in their own namespaces. In Act 2 each
+In Act 1, both agents have empty discourse graphs in their own namespaces. In Act 2 each
 team populates their graph independently, without any communication. Notice that
 `add()` is the only write method: it takes a Pydantic model, mints a URI, stamps
 a timestamp, and writes the RDF triples. No Turtle, no SPARQL, no rdflib
@@ -342,10 +492,13 @@ def cell_7_populate_alice(mo, alice_dg, DG, ENG, Question, Claim, Evidence, Deci
     alice_dg.add_edge(alice_D1, ENG.decision,      alice_Q1)
     alice_dg.add_edge(alice_D1, ENG.justification, alice_C1)
     alice_dg.add_edge(alice_D1, ENG.justification, alice_E1)
+    alice_dg.add_edge(alice_D1, ENG.justification, alice_C2)
     alice_dg.add_edge(alice_D1, ENG.opens,         alice_Q2)
+    alice_dg.add_edge(alice_C1, ENG.option,        alice_Q1)
+    alice_dg.add_edge(alice_C2, ENG.option,        alice_Q1)
 
     mo.vstack([
-        mo.md("**AliceGroup graph populated** — 7 nodes, 7 discourse edges."),
+        mo.md("**AliceGroup graph populated** — 7 nodes, 10 discourse edges."),
         mo.md(f"""
 | ID | Type | Label |
 |----|------|-------|
@@ -390,15 +543,20 @@ def cell_9_visualize_alice(mo, plt, alice_dg, visualize_graph):
     plt.tight_layout()
     mo.vstack([
         mo.as_html(_fig),
-        mo.md(
-            "*Node colours: steelblue = Question, seagreen = Claim, goldenrod = Evidence, "
-            "mediumpurple = Decision.*\n\n"
-            "D1 (`eng:decision`) → Q1: the decision resolves Q1. "
-            "D1 (`eng:justification`) → C1 and E1: the claim and evidence that justify the decision. "
-            "D1 (`eng:opens`) → Q2: the decision raises a downstream question for BobGroup. "
-            "E1 (`dg:supports`) → C1: empirical evidence backing the baseline claim. "
-            "E1 (`dg:informs`) → Q1: the delta-V budget directly informs the architecture question."
-        ),
+        mo.md(r"""
+*Node colours: steelblue = Question · seagreen = Claim · goldenrod = Evidence · mediumpurple = Decision*
+
+**Reading the graph as a trade study:**
+
+- **E1 → Q1** (`dg:informs`): the delta-V budget analysis is the primary empirical input to the architecture question.
+- **E1 → C1** (`dg:supports`): that same analysis is the evidence backing the claim that chemical bipropellant is the baseline.
+- **E2 → C2** (`dg:supports`): the schedule constraint analysis supports the finding that SEP is not viable within the mission timeline.
+- **D1 → Q1** (`eng:decision`): the architecture decision resolves the propulsion question.
+- **D1 → C1, E1** (`eng:justification`): D1 is grounded in the positive case — the bipropellant claim and its supporting evidence.
+- **D1 → C2** (`eng:justification`): D1 is also grounded in the negative case — the elimination of SEP. A trade study selects *among alternatives*; recording the losing alternative's non-viability as justification makes the reasoning complete and auditable.
+- **D1 → Q2** (`eng:opens`): committing to bipropellant immediately surfaces the thruster configuration question, which becomes BobGroup's problem to resolve.
+- **C1, C2 → Q1** (`eng:option`): both claims are registered as explicit candidate options for the propulsion design question — bipropellant as the selected architecture, SEP as the eliminated alternative. The full option set is visible in the graph.
+"""),
     ])
     return
 
@@ -433,9 +591,10 @@ def cell_10_populate_bob(mo, bob_dg, DG, ENG, Question, Claim, Evidence, Decisio
     bob_dg.add_edge(bob_D2, ENG.decision,      bob_Q2)
     bob_dg.add_edge(bob_D2, ENG.justification, bob_C3)
     bob_dg.add_edge(bob_D2, ENG.justification, bob_E3)
+    bob_dg.add_edge(bob_C3, ENG.option,        bob_Q2)
 
     mo.vstack([
-        mo.md("**BobGroup graph populated** — 4 local nodes, 4 discourse edges."),
+        mo.md("**BobGroup graph populated** — 4 local nodes, 5 discourse edges."),
         mo.callout(
             mo.md(
                 "Bob mints his own Q2 in his namespace. "
@@ -466,16 +625,23 @@ def cell_11_validate_bob(mo, bob_dg):
 @app.cell(hide_code=True)
 def cell_12_visualize_bob(mo, plt, bob_dg, visualize_graph):
     """Render Bob's pre-sharing graph."""
-    _fig, _ax = plt.subplots(figsize=(8, 6))
+    _fig, _ax = plt.subplots(figsize=(10, 7))
     visualize_graph(bob_dg, ax=_ax, title="BobGroup — pre-sharing graph")
     plt.tight_layout()
     mo.vstack([
         mo.as_html(_fig),
-        mo.md(
-            "*Bob's pre-sharing graph: Q2 (steelblue), C3 (seagreen), E3 (goldenrod), "
-            "D2 (mediumpurple). D2 `eng:decision` bob_Q2 — Bob's subsystem question. "
-            "Alice's E1 and C1 arrive in Act 4.*"
-        ),
+        mo.md(r"""
+*Node colours: steelblue = Question · seagreen = Claim · goldenrod = Evidence · mediumpurple = Decision*
+
+**Reading the graph as a subsystem trade:**
+
+- **E3 → C3** (`dg:supports`): the single-engine reliability analysis is the evidence backing the dual-engine claim.
+- **C3 → Q2** (`eng:option`): the dual-engine configuration is the candidate option Bob evaluated for the thruster question.
+- **D2 → Q2** (`eng:decision`): Bob's decision resolves the thruster configuration question.
+- **D2 → C3, E3** (`eng:justification`): the decision is grounded in the dual-engine claim and its supporting evidence.
+
+At this stage Bob's graph is self-contained but isolated — his D2 is grounded only in his own evidence. Alice's architecture baseline (C1) and delta-V analysis (E1) are not yet visible to Bob. Act 3 defines the policies that will change that.
+"""),
     ])
     return
 
@@ -504,17 +670,34 @@ def cell_13_act3_narration(mo):
     """Act 3 heading and narrative context."""
     mo.vstack([
         mo.md("## Act 3 — Policy Declaration"),
-        mo.md("""
-Alice declares two sharing policies in Python. Each policy names a grantee, a
-source graph, and a selection rule (type-based or node-explicit). The library
-stores each policy as a `dg:SharingPolicy` individual in a structurally isolated
-`_policy` graph — it never touches `_store`. At export time the policy is
-compiled to a SPARQL CONSTRUCT query.
-
-This act shows the artifacts. The SPARQL was not written by Alice; it was
-generated from the RDF. This is the architectural guarantee: Alice cannot write
-a malformed policy by accident, and the query is always inspectable.
-"""),
+        mo.md(
+"Alice controls what she shares and with whom using a single Python call. "
+"She declares two policies in this act.\n\n"
+"**Policy A** (`evidence-sharing`) — share all Evidence nodes with Bob, "
+"except E2 (the schedule constraint analysis Alice considers preliminary):\n\n"
+"```python\n"
+"alice_dg.declare_sharing_policy(\n"
+'    name="evidence-sharing",\n'
+"    grantee_uri=bob_agent.uri,\n"
+"    source_graph_uri=alice_agent.graph_uri(\"local\"),\n"
+"    include_types=[DG.Evidence],        # share all Evidence nodes …\n"
+"    exclude_nodes=[alice_E2],           # … except E2-Schedule\n"
+")\n"
+"```\n\n"
+"**Policy B** (`arch-claim`) — share one specific Claim node by URI, "
+"no evidence chain attached:\n\n"
+"```python\n"
+"alice_dg.declare_sharing_policy(\n"
+'    name="arch-claim",\n'
+"    grantee_uri=bob_agent.uri,\n"
+"    source_graph_uri=alice_agent.graph_uri(\"local\"),\n"
+"    include_nodes=[alice_C1],           # share C1-ChemBiprop only\n"
+")\n"
+"```\n\n"
+"The cells below lift the hood: each call produces a formal RDF record and a "
+"compiled SPARQL query. Alice never writes either artifact — the library "
+"generates them from her Python call and guarantees they are well-formed."
+),
     ])
     return
 
@@ -532,11 +715,21 @@ def cell_14_policy_a_declared(mo, alice_dg, alice_agent, bob_agent, alice_E2, DG
 
     mo.vstack([
         mo.md("**Policy A declared:** `evidence-sharing`"),
-        mo.md(f"- Grantee: `{bob_agent.uri}`"),
-        mo.md(f"- Include types: `[dg:Evidence]`"),
-        mo.md(f"- Exclude nodes: `[E2-Schedule]`"),
-        mo.md(f"- **Permitted set:** {{E1}}"),
-        mo.md(f"- Policy URI: `{policy_A_uri}`"),
+        mo.md(
+            f"- Grantee: `{bob_agent.uri}`\n"
+            f"- Include types: `[dg:Evidence]`\n"
+            f"- Exclude nodes: `[E2-Schedule]`\n"
+            f"- **Permitted set:** {{E1}}\n"
+            f"- Policy URI: `{policy_A_uri}`"
+        ),
+        mo.callout(
+            mo.md(
+                "E1 is shared; E2-Schedule is withheld — Alice considers the schedule "
+                "constraint analysis preliminary. Bob receives evidence of the delta-V "
+                "budget but not the SEP elimination rationale."
+            ),
+            kind="info",
+        ),
     ])
     return (policy_A_uri,)
 
@@ -549,25 +742,24 @@ def cell_15_policy_a_rdf(mo, alice_dg):
     call produced a formal RDF artifact stored in the isolated _policy graph.
     """
     _turtle = alice_dg._policy.serialize(format="turtle")
-    mo.vstack([
-        mo.md("### Policy A — RDF artifact (`alice_dg._policy` serialised as Turtle)"),
-        mo.md(
-            "Alice wrote one Python call. The system produced this formal RDF. "
-            "Note `dg:SharingPolicy`, `dg:grantee`, `dg:sourceGraph`, "
-            "`dg:includesType`, `dg:excludesNode`."
-        ),
-        mo.md(f"```turtle\n{_turtle}\n```"),
-        mo.callout(
+    mo.accordion({
+        "Policy A — RDF artifact (expand to inspect)": mo.vstack([
             mo.md(
-                "`alice_dg._policy` is a standalone `rdflib.Graph` — it is never passed to "
-                "`_store.get_context()`, `_store.addN()`, or any SPARQL query. "
-                "This structural isolation is the enforcement mechanism for INV-P3: a compromised "
-                "`export_policy()` implementation cannot leak triples from `_store` into an "
-                "unauthorized export, because `_policy` is never in `_store`."
+                "Alice wrote one Python call. The system produced this formal RDF. "
+                "Note `dg:SharingPolicy`, `dg:grantee`, `dg:sourceGraph`, "
+                "`dg:includesType`, `dg:excludesNode`."
             ),
-            kind="info",
-        ),
-    ])
+            mo.md(f"```turtle\n{_turtle}\n```"),
+            mo.callout(
+                mo.md(
+                    "`alice_dg._policy` is a standalone `rdflib.Graph` — it is never passed to "
+                    "`_store.get_context()`, `_store.addN()`, or any SPARQL query. "
+                    "This structural isolation is the enforcement mechanism for INV-P3."
+                ),
+                kind="info",
+            ),
+        ]),
+    })
     return
 
 
@@ -578,21 +770,19 @@ def cell_16_policy_a_sparql(mo, alice_dg, policy_A_uri):
 
     _permitted_labels = [str(u).rsplit("/", 1)[-1] for u in sorted(str(u) for u in permitted_A)]
 
-    mo.vstack([
-        mo.md("### Policy A — compiled SPARQL CONSTRUCT"),
-        mo.md(
-            "The SPARQL was generated from the RDF policy above — Alice never wrote SQL or SPARQL. "
-            "In plain English, the edge-bounding rule says: a triple `(s, p, o)` may only be "
-            "exported if the subject `s` is in the permitted set AND either the object is a plain "
-            "value (literal), the predicate is not a discourse predicate, or the object is also in "
-            "the permitted set. This prevents edges from escaping the policy boundary even when "
-            "both endpoints happen to exist in Alice's store. "
-            "Formally: `(s, p, o)` exported iff `s ∈ permitted` AND "
-            "(`isLiteral(o)` OR `p ∉ DISCOURSE_PREDICATES` OR `o ∈ permitted`)."
-        ),
-        mo.md(f"```sparql\n{sparql_A}\n```"),
-        mo.md(f"**Permitted set:** `{{{', '.join(_permitted_labels)}}}`"),
-    ])
+    mo.accordion({
+        "Policy A — compiled SPARQL CONSTRUCT (expand to inspect)": mo.vstack([
+            mo.md(
+                "The SPARQL was generated from the RDF policy above — Alice never wrote SQL or SPARQL. "
+                "The edge-bounding rule: a triple `(s, p, o)` is exported iff `s ∈ permitted` AND "
+                "(`isLiteral(o)` OR `p ∉ DISCOURSE_PREDICATES` OR `o ∈ permitted`). "
+                "This prevents discourse edges from crossing the policy boundary even when both "
+                "endpoints exist in Alice's store."
+            ),
+            mo.md(f"**Permitted set:** `{{{', '.join(_permitted_labels)}}}`"),
+            mo.md(f"```sparql\n{sparql_A}\n```"),
+        ]),
+    })
     return (sparql_A, permitted_A)
 
 
@@ -608,13 +798,15 @@ def cell_17_policy_b_declared(mo, alice_dg, alice_agent, bob_agent, alice_C1):
 
     mo.vstack([
         mo.md("**Policy B declared:** `arch-claim`"),
-        mo.md(f"- Grantee: `{bob_agent.uri}`"),
-        mo.md(f"- Include nodes: `[C1-ChemBiprop]`"),
-        mo.md(f"- **Permitted set:** {{C1}} — no type filter, no exclude"),
-        mo.md(f"- Policy URI: `{policy_B_uri}`"),
+        mo.md(
+            f"- Grantee: `{bob_agent.uri}`\n"
+            f"- Include nodes: `[C1-ChemBiprop]`\n"
+            f"- **Permitted set:** {{C1}} — no type filter, no exclude\n"
+            f"- Policy URI: `{policy_B_uri}`"
+        ),
         mo.callout(
             mo.md(
-                "C1 will be shared **without** E1 or E2 — Bob receives the baseline assertion "
+                "C1 is shared **without** E1 or E2 — Bob receives the baseline assertion "
                 "with no visible evidence chain. He must decide whether to accept it."
             ),
             kind="warn",
@@ -624,20 +816,23 @@ def cell_17_policy_b_declared(mo, alice_dg, alice_agent, bob_agent, alice_C1):
 
 
 @app.cell(hide_code=True)
-def cell_18_policy_b_rdf(mo, alice_dg):
-    """Print updated _policy Turtle — now contains both policies."""
-    _turtle = alice_dg._policy.serialize(format="turtle")
-    mo.vstack([
-        mo.md("### Policy graph after both declarations"),
-        mo.accordion({
-            "Full Turtle (both policies)": mo.md(f"```turtle\n{_turtle}\n```"),
-        }),
-        mo.md(
-            "Both `dg:SharingPolicy` individuals are in the same isolated `_policy` graph. "
-            "Contrast the `dg:includesType` triple in Policy A with the `dg:includesNode` "
-            "triple in Policy B — different selection mechanisms, different epistemic characters."
-        ),
-    ])
+def cell_18_policy_b_rdf(mo, alice_dg, policy_B_uri):
+    """Print Policy B's RDF triples from _policy (B's contribution only)."""
+    from rdflib import Graph as _Graph
+    _g = _Graph()
+    for _triple in alice_dg._policy.triples((policy_B_uri, None, None)):
+        _g.add(_triple)
+    _turtle = _g.serialize(format="turtle")
+    mo.accordion({
+        "Policy B — RDF artifact (expand to inspect)": mo.vstack([
+            mo.md(
+                "Alice's second Python call produced this RDF. "
+                "Note `dg:includesNode` (node-explicit selection) vs. "
+                "`dg:includesType` in Policy A (type-based selection)."
+            ),
+            mo.md(f"```turtle\n{_turtle}\n```"),
+        ]),
+    })
     return
 
 
@@ -648,17 +843,60 @@ def cell_19_policy_b_sparql(mo, alice_dg, policy_B_uri):
 
     _permitted_labels = [str(u).rsplit("/", 1)[-1] for u in sorted(str(u) for u in permitted_B)]
 
-    mo.vstack([
-        mo.md("### Policy B — compiled SPARQL CONSTRUCT"),
-        mo.md(
-            "Contrast with Policy A: `VALUES ?s` now contains only C1. "
-            "No `dg:supports` or `dg:informs` edges point into `{C1}` from E1 or E2, "
-            "so the edge-bounding FILTER drops all incoming discourse edges on C1."
-        ),
-        mo.md(f"```sparql\n{sparql_B}\n```"),
-        mo.md(f"**Permitted set:** `{{{', '.join(_permitted_labels)}}}`"),
-    ])
+    mo.accordion({
+        "Policy B — compiled SPARQL CONSTRUCT (expand to inspect)": mo.vstack([
+            mo.md(
+                "Contrast with Policy A: `VALUES ?s` now contains only C1. "
+                "No `dg:supports` or `dg:informs` edges point into `{C1}` from E1 or E2, "
+                "so the edge-bounding FILTER drops all incoming discourse edges — Bob "
+                "receives the claim but cannot see what evidence it rests on."
+            ),
+            mo.md(f"**Permitted set:** `{{{', '.join(_permitted_labels)}}}`"),
+            mo.md(f"```sparql\n{sparql_B}\n```"),
+        ]),
+    })
     return (sparql_B, permitted_B)
+
+
+@app.cell(hide_code=True)
+def cell_19b_policy_narration(mo, sparql_B):
+    """Narration: the combined policy as a formal, checkable ruleset."""
+    _ = sparql_B  # ordering dependency
+    mo.md("""
+Both policies are now declared. Together they form a **deterministic, serialized
+ruleset** — a formal RDF document that encodes exactly what Alice has authorised
+to leave her instance, and nothing more.
+
+This is not a configuration file or an access-control list that can drift from
+the code that enforces it. Every export must pass through `export_policy()`,
+which compiles the RDF directly to a SPARQL CONSTRUCT query and applies the
+edge-bounding rule. There is no code path from Alice's store to a shared graph
+that bypasses this step.
+
+The combined artifact below is the ground truth: if a triple does not follow
+from these rules, it is not exported. If the rules change, the artifact changes,
+and the compiled SPARQL changes with it. The policy is always inspectable,
+diffable, and executable.
+""")
+    return
+
+
+@app.cell(hide_code=True)
+def cell_19b_policy_combined_rdf(mo, alice_dg, sparql_B):
+    """Show combined Policy A + Policy B RDF — the full _policy graph."""
+    _ = sparql_B  # ordering dependency: display after Policy B SPARQL is compiled
+    _turtle = alice_dg._policy.serialize(format="turtle")
+    mo.accordion({
+        "Policy A + Policy B — combined RDF artifact (expand to inspect)": mo.vstack([
+            mo.md(
+                "Both `dg:SharingPolicy` individuals live in the same isolated `_policy` graph. "
+                "Contrast `dg:includesType` (Policy A) with `dg:includesNode` (Policy B) — "
+                "two different selection mechanisms, two different epistemic commitments."
+            ),
+            mo.md(f"```turtle\n{_turtle}\n```"),
+        ]),
+    })
+    return
 
 
 # ── Act 4: Sharing ─────────────────────────────────────────────────────────────

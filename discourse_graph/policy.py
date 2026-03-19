@@ -2,7 +2,7 @@
 
 # NAMESPACE STUB: replace with firm-controlled IRI before production use.
 
-This module owns the :data:`DISCOURSE_PREDICATES` frozenset — the six
+This module owns the :data:`DISCOURSE_PREDICATES` frozenset — the seven
 predicates that are subject to the edge-bounding rule on policy export —
 and the private helper constants used by ``DiscourseGraph._check_add_edge``
 and ``DiscourseGraph._compile_policy``.
@@ -19,7 +19,7 @@ from discourse_graph.namespaces import DG, ENG
 
 # NAMESPACE STUB: replace with firm-controlled IRI before production use.
 
-#: The six discourse predicates subject to the edge-bounding rule on export.
+#: The seven discourse predicates subject to the edge-bounding rule on export.
 #: A triple ``(s, p, o)`` is exported iff
 #: ``s ∈ permitted ∧ (isLiteral(o) ∨ p ∉ DISCOURSE_PREDICATES ∨ o ∈ permitted)``.
 DISCOURSE_PREDICATES: frozenset[URIRef] = frozenset({
@@ -29,6 +29,7 @@ DISCOURSE_PREDICATES: frozenset[URIRef] = frozenset({
     ENG.decision,       # eng:Decision → dg:Question
     ENG.opens,          # eng:Decision → dg:Question
     ENG.justification,  # eng:Decision → dg:DiscourseNode (any)
+    ENG.option,         # dg:Claim → dg:Question
 })
 
 #: Domain / range table for structural validation in ``_check_add_edge``.
@@ -44,6 +45,7 @@ _PRED_DOMAIN_RANGE: dict[URIRef, tuple[URIRef, URIRef]] = {
     ENG.decision:       (ENG.Decision,   DG.Question),
     ENG.opens:          (ENG.Decision,   DG.Question),
     ENG.justification:  (ENG.Decision,   DG.DiscourseNode),
+    ENG.option:         (DG.Claim,       DG.Question),
 }
 
 #: All valid OWL class URIs for discourse nodes.  Used by ``_check_add_node``

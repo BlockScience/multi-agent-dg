@@ -101,14 +101,27 @@ def test_fr_ont_eng_9_namespace_stub_comment():
     assert "NAMESPACE STUB: replace with firm-controlled IRI before production use." in source
 
 
+# FR-ONT-ENG-10 ───────────────────────────────────────────────────────────────
+
+def test_fr_ont_eng_10_option_predicate(eng_graph):
+    """FR-ONT-ENG-10: eng:option domain dg:Claim, range dg:Question."""
+    pred = ENG.option
+    assert (pred, RDF.type, OWL.ObjectProperty) in eng_graph
+    assert (pred, RDFS.domain, DG.Claim) in eng_graph
+    assert (pred, RDFS.range, DG.Question) in eng_graph
+
+
 # ARCH ────────────────────────────────────────────────────────────────────────
 
 def test_seam_dg_question_only_shared():
-    """ARCH: eng: must not reference dg: classes other than dg:Question and dg:DiscourseNode.
+    """ARCH: eng: must not re-declare dg: node classes.
 
-    dg:Question is the intentional seam — referenced as range of eng:decision and eng:opens.
+    dg:Question is the intentional seam — referenced as range of eng:decision, eng:opens,
+    and eng:option.
     dg:DiscourseNode is referenced as superclass of eng:Decision and range of eng:justification.
-    No other dg: node classes should appear in the eng: Turtle.
+    dg:Claim is referenced as domain of eng:option.
+    Re-declaring any of these as eng:Question, eng:Claim, etc. is forbidden.
+    Cross-namespace references (dg:Claim as a domain) are permitted.
     """
     # These would violate the seam design
     forbidden = [
