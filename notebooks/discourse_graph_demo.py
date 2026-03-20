@@ -193,21 +193,23 @@ SPARQL artifacts that Alice's Python calls produce before any data moves.
 | 1 | 2–5 | Setup — load ontologies, create agents and graphs |
 | 2 | 6–11 | Individual graphs — Alice and Bob build independently |
 | 3 | 12–17 | Policy declaration — Alice writes two policies; inspect the Turtle and SPARQL artifacts |
-| 4 | 18–26 | Sharing — policy A (direct evidence), policy B (hidden-backing claim); invariants demonstrated |
+| 4 | 18–26 | Sharing — policy A (direct evidence), policy B (hidden-backing claim), policy C (decision closure); invariants |
 | 5 | 27–28 | Visualization and epistemic status summary |
 
 ---
 
-## Two sharing policies
+## Three sharing policies
 
-The contrast between the two policies is the central argument of the notebook.
+The contrast between Alice's two policies is the central argument of the notebook.
 Same source graph, same grantee, different permitted sets — different epistemic
 objects arrive in Bob's graph, and he must handle them differently.
+Bob's policy closes the loop by sharing his decision back to Alice.
 
-| Policy | Permitted set | Epistemic character |
-|--------|--------------|---------------------|
-| `evidence-sharing` | {E1} | Direct evidence: Bob receives Alice's delta-V analysis with full provenance |
-| `arch-claim` | {C1} | Hidden-backing claim: Bob receives Alice's baseline assertion with no visible justification |
+| Policy | Owner | Permitted set | Epistemic character |
+|--------|-------|--------------|---------------------|
+| `evidence-sharing` | Alice → Bob | {E1} | Direct evidence: Bob receives Alice's delta-V analysis with full provenance |
+| `arch-claim` | Alice → Bob | {C1} | Hidden-backing claim: Bob receives Alice's baseline assertion with no visible justification |
+| `subsystem-decision` | Bob → Alice | {D2} | Decision closure: Alice receives Bob's thruster decision, resolving the question her D1 opened |
 """),
     ])
     return
@@ -899,6 +901,37 @@ def cell_19b_policy_combined_rdf(mo, alice_dg, sparql_B):
     return
 
 
+@app.cell(hide_code=True)
+def cell_19c_bob_policy_c(mo, bob_dg, bob_agent, alice_agent, ENG):
+    """Bob declares Policy C — share all Decision nodes back to Alice."""
+    policy_C_uri = bob_dg.declare_sharing_policy(
+        name="subsystem-decision",
+        grantee_uri=alice_agent.uri,
+        source_graph_uri=bob_agent.graph_uri("local"),
+        include_types=[ENG.Decision],
+    )
+
+    mo.vstack([
+        mo.md("**Policy C declared:** `subsystem-decision`"),
+        mo.md(
+            f"- Grantee: `{alice_agent.uri}`\n"
+            f"- Include types: `[eng:Decision]`\n"
+            f"- **Permitted set:** {{D2}}\n"
+            f"- Policy URI: `{policy_C_uri}`"
+        ),
+        mo.callout(
+            mo.md(
+                "Bob shares all Decision nodes — currently just D2. "
+                "D2 resolves Q2, the question Alice's D1 opened. "
+                "Sharing decisions back is the natural counterpart to receiving "
+                "the evidence and claims that grounded them."
+            ),
+            kind="info",
+        ),
+    ])
+    return (policy_C_uri,)
+
+
 # ── Act 4: Sharing ─────────────────────────────────────────────────────────────
 
 @app.cell(hide_code=True)
@@ -906,15 +939,69 @@ def cell_20_act4_narration(mo):
     """Act 4 heading and narrative context."""
     mo.vstack([
         mo.md("## Act 4 — Sharing"),
-        mo.md("""
-Alice pushes each policy to Bob. For each export the system executes the compiled
-SPARQL CONSTRUCT against Alice's store and applies the edge-bounding rule: a
-triple `(s, p, o)` is exported only when `s` is in the permitted set AND either
-`o` is a literal, `p` is not a discourse predicate, or `o` is also in the
-permitted set. This prevents discourse edges from crossing the policy boundary
-even when both endpoints exist.
-"""),
+        mo.md(
+            "The sharing in this act is bidirectional. Alice exports two policies to Bob; "
+            "Bob exports one policy back to Alice. Each export runs the compiled SPARQL "
+            "CONSTRUCT and applies the edge-bounding rule — no triple crosses the boundary "
+            "unless its subject is in the permitted set and its discourse-edge object is too.\n\n"
+            "The sequence below shows all ten steps. "
+            "The final step closes the loop: Bob's D2 resolves the Q2 that Alice's D1 opened."
+        ),
     ])
+    return
+
+
+@app.cell(hide_code=True)
+def cell_20b_act4_sequence(mo, plt):
+    """Sequence diagram: Alice↔Bob sharing exchange."""
+    _fig, _ax = plt.subplots(figsize=(10, 7))
+    _ax.set_xlim(0, 10)
+    _ax.set_ylim(0, 10)
+    _ax.axis("off")
+
+    # ── Lifeline positions ────────────────────────────────────────────────────
+    _xa, _xb = 2.0, 8.0          # Alice and Bob x-positions
+    _y_top, _y_bot = 9.5, 0.3
+
+    # Lifeline headers
+    for _x, _name, _color in [(_xa, "Alice", "steelblue"), (_xb, "Bob", "seagreen")]:
+        _ax.text(_x, _y_top, _name, ha="center", va="center", fontsize=11,
+                 fontweight="bold", color="white",
+                 bbox=dict(boxstyle="round,pad=0.4", fc=_color, ec="none"))
+        _ax.plot([_x, _x], [_y_top - 0.35, _y_bot], color="lightgray",
+                 lw=1.2, linestyle="dashed", zorder=0)
+
+    # ── Steps (y decreasing = time flowing down) ─────────────────────────────
+    _steps = [
+        # (y,  x_start, x_end,  label,                                      side)
+        (8.4, _xa,    _xa,    "① Alice: declare Policy A + Policy B",        "self"),
+        (8.4, _xb,    _xb,    "② Bob: declare Policy C",                     "self"),
+        (7.5, _xa,    _xb,    "③ export_policy('evidence-sharing') → E1",    "send"),
+        (6.8, _xb,    _xb,    "④ ingest(E1)  — IngestedNode + provenance",  "self"),
+        (6.1, _xb,    _xb,    "⑤ add_edge(E1→Q2, D2→E1)",                   "self"),
+        (5.2, _xa,    _xb,    "⑥ export_policy('arch-claim') → C1",         "send"),
+        (4.5, _xb,    _xb,    "⑦ ingest(C1)  — IngestedNode + provenance",  "self"),
+        (3.8, _xb,    _xb,    "⑧ add(A1)  prov:wasDerivedFrom C1",          "self"),
+        (3.1, _xb,    _xb,    "⑨ add_edge(D2 eng:justification A1)",        "self"),
+        (2.1, _xb,    _xa,    "⑩ export_policy('subsystem-decision') → D2", "send"),
+        (1.3, _xa,    _xa,    "⑪ ingest(D2)  — D1 eng:opens Q2 ✓ resolved", "self"),
+    ]
+
+    for _y, _xs, _xe, _label, _kind in _steps:
+        if _kind == "send":
+            _ax.annotate("", xy=(_xe, _y), xytext=(_xs, _y),
+                         arrowprops=dict(arrowstyle="-|>", color="dimgray", lw=1.3))
+            _ax.text((_xs + _xe) / 2, _y + 0.18, _label,
+                     ha="center", va="bottom", fontsize=8.5, color="dimgray")
+        else:  # self-arrow
+            _ax.annotate("", xy=(_xs - 0.3, _y - 0.25), xytext=(_xs + 0.3, _y),
+                         arrowprops=dict(arrowstyle="-|>", color="dimgray", lw=1.0,
+                                         connectionstyle="arc3,rad=-0.4"))
+            _ax.text(_xs + 0.5, _y, _label,
+                     ha="left", va="center", fontsize=8.5, color="dimgray")
+
+    plt.tight_layout()
+    mo.vstack([mo.as_html(_fig)])
     return
 
 
@@ -941,7 +1028,7 @@ def cell_21_push_policy_a(mo, alice_dg, bob_agent, DG, alice_E1, alice_E2, alice
     _d1_triples = list(exported_A.triples((None, None, None)))
 
     mo.vstack([
-        mo.md(f"**Policy A exported:** {len(_d1_triples)} triples"),
+        mo.md(f"**Step ③ — Policy A exported:** {len(_d1_triples)} triples"),
         mo.callout(mo.md(
             "✓ E1 present  ·  ✓ E2 absent (INV-P1)  ·  ✓ E1→C1 edge dropped (INV-P2)  ·  "
             "✓ D1 not shared (D1 not in permitted set)"
@@ -956,7 +1043,7 @@ def cell_22_bob_ingests_a(mo, bob_dg, alice_agent, exported_A):
     ingested_A_uri = bob_dg.ingest(exported_A, alice_agent.uri)
 
     mo.vstack([
-        mo.md(f"**E1 ingested** into `{ingested_A_uri}`"),
+        mo.md(f"**Step ④ — E1 ingested** into `{ingested_A_uri}`"),
         mo.md(f"- Ingested graph triple count: {bob_dg.triple_count(ingested_A_uri)}"),
         mo.callout(mo.md(
             "`dg:IngestedNode` is a provenance wrapper, not a type change. E1 remains a "
@@ -977,7 +1064,8 @@ def cell_23_bob_uses_e1(mo, bob_dg, alice_E1, bob_Q2, bob_D2, DG, ENG):
     bob_dg.add_edge(bob_D2,   ENG.justification, alice_E1)
 
     mo.callout(mo.md(
-        "Bob connects E1 directly: `E1 dg:informs bob_Q2` and `D2 eng:justification E1`. "
+        "**Step ⑤** — Bob connects E1 directly: `E1 dg:informs bob_Q2` and "
+        "`D2 eng:justification E1`. "
         "Evidence type is unchanged — an empirical finding is an empirical finding, "
         "regardless of provenance. Bob traces attribution via `prov:wasAttributedTo`."
     ), kind="info")
@@ -1006,7 +1094,7 @@ def cell_24_push_policy_b(mo, alice_dg, bob_agent, alice_C1, alice_E1, alice_E2,
     )
 
     mo.vstack([
-        mo.md(f"**Policy B exported:** {len(list(exported_B.triples((None, None, None))))} triples"),
+        mo.md(f"**Step ⑥ — Policy B exported:** {len(list(exported_B.triples((None, None, None))))} triples"),
         mo.callout(mo.md(
             "✓ C1 present  ·  ✓ E1 absent (INV-P1)  ·  ✓ E2 absent (INV-P1)  ·  "
             "✓ No incoming dg:supports on C1 (INV-P2) — C1 arrives without its evidence chain"
@@ -1021,7 +1109,7 @@ def cell_25_bob_ingests_b(mo, bob_dg, alice_agent, exported_B):
     ingested_B_uri = bob_dg.ingest(exported_B, alice_agent.uri)
 
     mo.vstack([
-        mo.md(f"**C1 ingested** into `{ingested_B_uri}`"),
+        mo.md(f"**Step ⑦ — C1 ingested** into `{ingested_B_uri}`"),
         mo.callout(mo.md(
             "C1 is now in Bob's graph as a `dg:IngestedNode`. "
             "It carries `prov:wasAttributedTo alice_agent.uri` but no supporting evidence. "
@@ -1069,7 +1157,7 @@ def cell_26_bob_promotes_c1(mo, bob_dg, alice_C1, alice_agent, PROV, Assumption)
     bob_dg.add_edge(bob_A1, PROV.wasAttributedTo, alice_agent.uri)
 
     mo.vstack([
-        mo.md(f"**A1 created:** `{bob_A1}`"),
+        mo.md(f"**Step ⑧ — A1 created:** `{bob_A1}`"),
         mo.callout(mo.md(
             "Why `Assumption` and not `Claim`? A `Claim` represents an assertion whose evidence "
             "chain is locally inspectable. Bob cannot see the reasoning behind C1 — Alice's policy "
@@ -1089,7 +1177,7 @@ def cell_27_bob_decision_grounded(mo, bob_dg, bob_D2, bob_C3, bob_E3, alice_E1, 
     bob_dg.add_edge(bob_D2, ENG.justification, bob_A1)
 
     mo.vstack([
-        mo.md("**D2 justification chain (complete):**"),
+        mo.md("**Step ⑨ — D2 justification chain (complete):**"),
         mo.md(f"""
 | Justification | Origin | Epistemic status |
 |--------------|--------|-----------------|
@@ -1125,13 +1213,75 @@ def cell_28_validate_bob_post(mo, bob_dg):
 # ── Cell 25b: Close Act 4 ─────────────────────────────────────────────────────
 
 @app.cell(hide_code=True)
-def cell_28b_act4_close(mo):
-    """Act 4 closing narration: full graph passes; invariants coming up."""
-    mo.md("""
-Bob's full graph — local nodes, ingested Evidence, ingested Claim, and the new
-Assumption — passes all nine SHACL shapes. The invariant cell below checks the
-architectural guarantees that made this possible.
-""")
+def cell_28b_act4_close(mo, report_bob_post):
+    """Bridge narration: Bob's graph passes; steps ⑩–⑪ remain."""
+    _ = report_bob_post
+    mo.md(
+        "Bob's graph conforms after the Alice→Bob exchange (steps ③–⑨). "
+        "Steps ⑩ and ⑪ close the loop: Bob exports D2 back to Alice, and "
+        "Alice connects it to the question her D1 originally opened."
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def cell_28d_push_policy_c(mo, bob_dg, alice_agent, bob_D2, report_bob_post):
+    """Bob exports Policy C — D2 leaves Bob's instance."""
+    _ = report_bob_post  # ordering: export after Bob's graph is validated
+    exported_C, _ = bob_dg.export_policy("subsystem-decision", alice_agent.uri)
+
+    assert any(exported_C.triples((bob_D2, None, None))), (
+        "Policy C must include D2"
+    )
+
+    mo.vstack([
+        mo.md(f"**Step ⑩ — Policy C exported:** {len(list(exported_C.triples((None, None, None))))} triples"),
+        mo.callout(mo.md(
+            "✓ D2 present  ·  ✓ C3 and E3 absent (not in permitted set)  ·  "
+            "✓ edge-bounding applied — Bob's full evidence chain is not exposed"
+        ), kind="success"),
+    ])
+    return (exported_C,)
+
+
+@app.cell(hide_code=True)
+def cell_28e_alice_ingests_d2(mo, alice_dg, bob_agent, exported_C, bob_D2, alice_Q2, ENG):
+    """Alice ingests D2 and connects it to her open Q2 — the loop closes."""
+    ingested_C_uri = alice_dg.ingest(exported_C, bob_agent.uri)
+    alice_dg.add_edge(bob_D2, ENG.decision, alice_Q2)
+
+    mo.vstack([
+        mo.md(f"**Step ⑪ — D2 ingested** into `{ingested_C_uri}`"),
+        mo.callout(
+            mo.md(
+                "`D1 eng:opens alice_Q2` — `bob_D2 eng:decision alice_Q2`. "
+                "The question Alice's architecture decision raised is now resolved. "
+                "Steps ①–⑪ complete. The discourse graph is closed."
+            ),
+            kind="success",
+        ),
+    ])
+    return (ingested_C_uri,)
+
+
+@app.cell(hide_code=True)
+def cell_28f_invariants_intro(mo, ingested_C_uri):
+    """Introduce the invariants subsection as distinct from the step walk-through."""
+    _ = ingested_C_uri  # ordering: run after step ⑪
+    mo.vstack([
+        mo.md("### Architectural Invariant Review"),
+        mo.md(
+            "The cells above walked through the exchange step by step. "
+            "This final subsection of Act 4 does something different: it checks "
+            "the **architectural invariants** — properties the library guarantees "
+            "by construction for *any* valid export from any conforming "
+            "`DiscourseGraph`, not just for this scenario. "
+            "These are not narrative steps. "
+            "Each assertion below is tied to a requirement ID in "
+            "`docs/REQUIREMENTS.md` and would catch a regression if the "
+            "library's export or policy logic were changed."
+        ),
+    ])
     return
 
 
@@ -1154,14 +1304,12 @@ def cell_29_invariants(
     """Demonstrate all five architectural invariants with labelled assertions."""
 
     mo.vstack([
-        mo.md("""
-The five invariants below are architectural guarantees — they hold for any valid
-export from any conforming `DiscourseGraph`, not just for this scenario.
-INV-P1 and INV-P2 together enforce the edge-bounding rule on every exported triple.
-INV-P3 enforces that policy RDF is structurally isolated from the knowledge store
-(structural enforcement, not convention). OP-1 and the Python subclass assertion
-connect the graph-level constraints back to the OWL axioms.
-"""),
+        mo.md(
+            "INV-P1/P2 verify edge-bounding on both exports. "
+            "INV-P3 asserts `_policy` structural isolation. "
+            "OP-1 checks the `eng:opens` / `eng:decision` disjointness axiom. "
+            "The subclass assertion connects the Python model to the OWL hierarchy."
+        ),
     ])
 
     # ── INV-P1 / INV-P2: edge-bounding over both exports ─────────────────────
@@ -1237,11 +1385,18 @@ def cell_30_act5_narration(mo):
     """Act 5 heading and narrative context."""
     mo.vstack([
         mo.md("## Act 5 — Visualization"),
-        mo.md("""
-The side-by-side view shows both graphs after the sharing event. Ingested nodes
-carry a dashed orange border. The dashed gray arrow from A1 to C1* shows the
-`prov:wasDerivedFrom` edge Bob added when he promoted C1 to an Assumption.
-"""),
+        mo.md(
+            "The side-by-side graph below shows both instances after all sharing "
+            "events. Four visual cues mark the cross-instance relationships:\n\n"
+            "- **Dashed orange border** — ingested node: the receiving agent's copy "
+            "of a node authored by the other agent.\n"
+            "- **Dashed gray arrows Alice → Bob** — E1 and C1 crossed the boundary "
+            "via Policy A and Policy B.\n"
+            "- **Dashed gray arrow Bob → Alice** — D2 crossed the boundary via "
+            "Policy C; Alice's `eng:opens Q2` is now resolved.\n"
+            "- **Dashed gray arrow within Bob's panel** — `prov:wasDerivedFrom`: "
+            "Bob's Assumption A1 is explicitly derived from Alice's C1\\*."
+        ),
     ])
     return
 
@@ -1252,11 +1407,19 @@ def cell_31_visualize_sharing(mo, plt, alice_dg, bob_dg, alice_E1, alice_C1, vis
     _fig = visualize_sharing(alice_dg, bob_dg, [alice_E1, alice_C1])
     mo.vstack([
         mo.as_html(_fig),
-        mo.md(
-            "*Left: Alice's full graph — D1 connects Q1, C1, E1, and opens Q2. "
-            "Right: Bob's post-sharing graph — E1\\* and C1\\* (dashed orange border = ingested), "
-            "A1 (sandybrown = Assumption), dashed gray arrow = `prov:wasDerivedFrom` A1→C1\\*.*"
-        ),
+        mo.md(r"""
+*Node colours: steelblue = Question · seagreen = Claim · goldenrod = Evidence · mediumpurple = Decision · sandybrown = Assumption*
+
+**Reading the sharing graph:**
+
+- **Left panel (Alice):** full pre-sharing graph — Q1, C1, E1, E2, D1, Q2 with all discourse edges.
+- **Right panel (Bob):** post-sharing graph — Bob's four local nodes plus two ingested nodes (dashed orange border).
+- **Dashed gray arrows Alice → Bob:** E1 (Policy A) and C1 (Policy B) crossed the boundary; each arrow traces source to ingested copy.
+- **E1\* (Bob's panel):** ingested Evidence — full provenance intact; Bob uses it directly as `eng:justification` for D2.
+- **C1\* (Bob's panel):** ingested Claim — no evidence chain; Bob promotes it to Assumption A1 to record the epistemic gap honestly.
+- **Dashed gray arrow within Bob's panel:** `prov:wasDerivedFrom` — A1 is explicitly derived from C1\*.
+- **Dashed gray arrow Bob → Alice:** D2 (Policy C) crossed back; Alice's `eng:opens Q2` is now resolved — the discourse graph is closed.
+"""),
     ])
     return
 

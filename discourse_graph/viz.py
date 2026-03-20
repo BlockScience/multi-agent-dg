@@ -291,7 +291,10 @@ def visualize_sharing(
     ``prov:wasDerivedFrom`` triples, which are not discourse predicates and
     are therefore invisible to :meth:`~discourse_graph.graph.DiscourseGraph.discourse_edges`.
     """
-    fig, (ax_alice, ax_bob) = plt.subplots(1, 2, figsize=(16, 7))
+    import matplotlib.lines as _mlines
+    from matplotlib.patches import ConnectionPatch as _CP
+
+    fig, (ax_alice, ax_bob) = plt.subplots(1, 2, figsize=(18, 8))
 
     visualize_graph(
         alice_dg,
@@ -305,10 +308,53 @@ def visualize_sharing(
         title=f"{bob_dg._agent.name} — post-sharing",
     )
 
+    # ── Vertical instance-boundary divider ────────────────────────────────────
+    _divider = _mlines.Line2D(
+        [0.5, 0.5], [0.04, 0.96],
+        transform=fig.transFigure,
+        color="lightgray",
+        linewidth=1.5,
+        linestyle=(0, (8, 4)),
+        zorder=0,
+    )
+    fig.add_artist(_divider)
+    fig.text(0.497, 0.97, "instance boundary", ha="right", va="bottom",
+             fontsize=7, color="lightgray", transform=fig.transFigure)
+
+    # ── Cross-panel provenance arrows (shared node in Alice → ingested in Bob) ─
+    # Both calls use seed=42 so positions match the panels drawn above.
+    _, alice_pos, _, _, alice_ingested = _build_discourse_graph_nx(alice_dg)
+    _, bob_pos, _, _, bob_ingested = _build_discourse_graph_nx(bob_dg)
+
+    # Alice-originated nodes shared to Bob (Alice panel → Bob panel)
+    for _node in bob_ingested:
+        if _node in alice_pos and _node in bob_pos:
+            _conn = _CP(
+                xyA=alice_pos[_node], xyB=bob_pos[_node],
+                coordsA="data", coordsB="data",
+                axesA=ax_alice, axesB=ax_bob,
+                color="silver", linestyle="dashed",
+                lw=1.2, arrowstyle="-|>", mutation_scale=12,
+                zorder=1,
+            )
+            fig.add_artist(_conn)
+
+    # Bob-originated nodes shared to Alice (Bob panel → Alice panel)
+    for _node in alice_ingested:
+        if _node in bob_pos and _node in alice_pos:
+            _conn = _CP(
+                xyA=bob_pos[_node], xyB=alice_pos[_node],
+                coordsA="data", coordsB="data",
+                axesA=ax_bob, axesB=ax_alice,
+                color="silver", linestyle="dashed",
+                lw=1.2, arrowstyle="-|>", mutation_scale=12,
+                zorder=1,
+            )
+            fig.add_artist(_conn)
+
     # ── Overlay prov:wasDerivedFrom edges on Bob's panel ─────────────────────
     # These are PROV edges, not discourse predicates, so discourse_edges() does
     # not include them.  Direct _store access is required here.
-    _, bob_pos, bob_labels, _, _ = _build_discourse_graph_nx(bob_dg)
 
     prov_edges = list(bob_dg._store.triples((None, PROV.wasDerivedFrom, None)))
     for subj, _, obj in prov_edges:
