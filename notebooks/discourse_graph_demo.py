@@ -1386,16 +1386,24 @@ def cell_30_act5_narration(mo):
     mo.vstack([
         mo.md("## Act 5 — Visualization"),
         mo.md(
-            "The side-by-side graph below shows both instances after all sharing "
-            "events. Four visual cues mark the cross-instance relationships:\n\n"
-            "- **Dashed orange border** — ingested node: the receiving agent's copy "
-            "of a node authored by the other agent.\n"
-            "- **Dashed gray arrows Alice → Bob** — E1 and C1 crossed the boundary "
-            "via Policy A and Policy B.\n"
-            "- **Dashed gray arrow Bob → Alice** — D2 crossed the boundary via "
-            "Policy C; Alice's `eng:opens Q2` is now resolved.\n"
+            "The full exchange is now complete. Both graphs are in their final "
+            "post-sharing state and have passed SHACL validation. The side-by-side "
+            "diagram below renders the combined epistemic record — Alice's full "
+            "graph on the left, Bob's post-sharing graph on the right — with the "
+            "instance boundary marked by the dashed vertical line.\n\n"
+            "Four visual cues encode the cross-instance relationships:\n\n"
+            "- **Dashed orange border** — ingested node: a copy of a node "
+            "authored by the other agent, carrying `prov:wasAttributedTo` and "
+            "`dg:ingestedAt` annotations.\n"
+            "- **Dashed gray arrows Alice → Bob** — E1 crossed via Policy A "
+            "(direct evidence, provenance intact); C1 crossed via Policy B "
+            "(claim only, evidence chain withheld by policy).\n"
+            "- **Dashed gray arrow Bob → Alice** — D2 crossed via Policy C; "
+            "Alice's `D1 eng:opens Q2` is now resolved by Bob's decision.\n"
             "- **Dashed gray arrow within Bob's panel** — `prov:wasDerivedFrom`: "
-            "Bob's Assumption A1 is explicitly derived from Alice's C1\\*."
+            "Bob's Assumption A1 is explicitly derived from the ingested C1, "
+            "recording that the epistemic gap introduced by Policy B has been "
+            "acknowledged rather than papered over."
         ),
     ])
     return
@@ -1408,17 +1416,15 @@ def cell_31_visualize_sharing(mo, plt, alice_dg, bob_dg, alice_E1, alice_C1, vis
     mo.vstack([
         mo.as_html(_fig),
         mo.md(r"""
-*Node colours: steelblue = Question · seagreen = Claim · goldenrod = Evidence · mediumpurple = Decision · sandybrown = Assumption*
+*Node colours: steelblue = Question · seagreen = Claim · goldenrod = Evidence · mediumpurple = Decision · sandybrown = Assumption · dashed orange border = ingested node*
 
 **Reading the sharing graph:**
 
-- **Left panel (Alice):** full pre-sharing graph — Q1, C1, E1, E2, D1, Q2 with all discourse edges.
-- **Right panel (Bob):** post-sharing graph — Bob's four local nodes plus two ingested nodes (dashed orange border).
-- **Dashed gray arrows Alice → Bob:** E1 (Policy A) and C1 (Policy B) crossed the boundary; each arrow traces source to ingested copy.
-- **E1\* (Bob's panel):** ingested Evidence — full provenance intact; Bob uses it directly as `eng:justification` for D2.
-- **C1\* (Bob's panel):** ingested Claim — no evidence chain; Bob promotes it to Assumption A1 to record the epistemic gap honestly.
-- **Dashed gray arrow within Bob's panel:** `prov:wasDerivedFrom` — A1 is explicitly derived from C1\*.
-- **Dashed gray arrow Bob → Alice:** D2 (Policy C) crossed back; Alice's `eng:opens Q2` is now resolved — the discourse graph is closed.
+- **Left panel (Alice, post-sharing):** complete reasoning graph — Q1, C1, C2, E1, E2, D1, Q2. D1 `eng:opens` Q2, which is visible here as the long arc from D1 down to Q2. D2 (dashed border) arrived from Bob via Policy C and now sits in Alice's graph, closing that open question.
+- **Right panel (Bob, post-sharing):** four local nodes (Q2, C3, E3, D2) plus three ingested nodes (dashed orange borders): E1\*, C1\*, and the prov edge from A1 to C1\*.
+- **E1\* in Bob's panel:** full provenance preserved end-to-end. Bob uses it directly as `eng:justification` for D2 — the evidence chain from Alice's delta-V analysis runs through to Bob's thruster decision.
+- **C1\* in Bob's panel:** the evidence chain behind C1 was withheld by Policy B. Bob's honest response is Assumption A1, derived from C1\* via `prov:wasDerivedFrom`. The epistemic gap is named, scoped, and attributed — not hidden.
+- **Dashed gray arrow Bob → Alice:** D2 crossed back via Policy C. The question Alice's D1 opened (`eng:opens Q2`) is answered by Bob's decision. The collaborative reasoning graph is closed.
 """),
     ])
     return
@@ -1426,32 +1432,61 @@ def cell_31_visualize_sharing(mo, plt, alice_dg, bob_dg, alice_E1, alice_C1, vis
 
 @app.cell(hide_code=True)
 def cell_32_summary(mo):
-    """Epistemic status table — all nodes in Bob's post-sharing graph."""
+    """Epistemic status table and concluding summary with BLUF callback."""
     mo.vstack([
         mo.md("## Epistemic Status — BobGroup Post-Sharing"),
         mo.md(r"""
+The table below summarises every node in Bob's final graph, its origin, and
+the epistemic status the library assigned or enforced.
+
 | Node | Type | Origin | Epistemic status |
 |------|------|--------|-----------------|
 | Q2-ThrusterConfig | Question | Alice (cross-agent ref) | Shared URI — content known to Alice only |
 | C3-DualEngine | Claim | Bob's own | Local assertion |
 | E3-SingleEngine | Evidence | Bob's own | Local empirical finding |
-| D2-DualEngine500N | Decision | Bob's own | Local decision, justified below |
+| D2-DualEngine500N | Decision | Bob's own | Justified by C3, E3, E1\*, and A1; conforms to DS-1 |
 | E1-DeltaV | Evidence | Alice via Policy A | Ingested empirical finding — full provenance, type unchanged |
 | C1-ChemBiprop | Claim | Alice via Policy B | Ingested isolated claim — evidence chain withheld by Alice's policy |
-| A1-BipropAccepted | Assumption | Bob (derived from C1) | Explicit assumption — scope declared, attribution preserved |
+| A1-BipropAccepted | Assumption | Bob (derived from C1\*) | Explicit assumption — scope declared, attribution preserved |
 
-**Key observation:** The two sharing policies produce two qualitatively different epistemic objects
-in Bob's graph. E1 arrives as a first-class empirical finding. C1 arrives as an isolated assertion;
-Bob's honest response is to promote it to an Assumption with explicit scope and attribution.
-The system enforces the boundary — Bob cannot see E1 or E2 behind C1 — and the Assumption
-makes that boundary visible in the graph structure itself.
+The two rows at the bottom tell the central story. E1 and C1 were exported from the same
+source graph by the same agent to the same recipient — but under different policies.
+E1 arrives as a first-class empirical finding with an intact evidence chain;
+Bob connects it directly as `eng:justification` for D2.
+C1 arrives as an isolated assertion with no visible backing;
+Bob cannot treat it as evidence because the library enforces the boundary — E1 and E2
+behind C1 are not in the export. His honest response is Assumption A1: the epistemic gap
+is named, scoped, and attributed rather than hidden behind a local Claim.
+"""),
+        mo.md(r"""
+### Conclusion
+
+The opening claim of this notebook was that **knowledge sharing across agents is only
+meaningful if the epistemic provenance of each shared item is preserved and legible.**
+The exchange above demonstrates this concretely.
+
+Alice wrote three short Python calls — `declare_sharing_policy`, `export_policy`,
+and the corresponding `ingest` on Bob's side — and the library produced:
+formal RDF policy artifacts inspectable at any time; a compiled SPARQL CONSTRUCT
+query that enforces the boundary mechanically; ingested subgraphs with
+`prov:wasAttributedTo` and `dg:ingestedAt` annotations attached automatically;
+and SHACL validation that would reject any graph where those annotations are missing.
+
+Bob's graph does not merely record *what* he decided. It records *why*, *on what basis*,
+*which parts of the basis came from outside his instance*, and *which of those he
+accepted on trust without being able to verify the backing*. That last item —
+Assumption A1 — is not a limitation of the system. It is the system working correctly:
+the epistemic boundary introduced by Alice's policy is made visible in the graph
+structure itself, and a downstream auditor can read it directly from the RDF.
 """),
         mo.callout(mo.md(
-            "The discourse-graph library makes epistemic boundaries first-class. Alice writes "
-            "Python; the library produces inspectable RDF and SPARQL. Bob's graph records not "
-            "just what he knows but how he knows it and what he chose to accept on trust. "
-            "The SHACL shapes enforce that these provenance annotations are always present — "
-            "no node can be silently ingested without attribution."
+            "Alice writes Python. The library produces inspectable RDF, compiled SPARQL, "
+            "and a SHACL-validated graph in which every knowledge transfer is formally "
+            "described, every epistemic status is explicit, and every policy boundary is "
+            "enforced — not documented, enforced. "
+            "The formal machinery (OWL 2 DL ontology, SHACL shapes, SPARQL policy "
+            "compilation) stays under the hood; the surface API is lightweight enough "
+            "to integrate into existing data pipelines and analysis workflows."
         ), kind="success"),
     ])
     return

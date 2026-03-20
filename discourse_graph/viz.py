@@ -75,6 +75,7 @@ def _pred_label(pred_uri: URIRef) -> str:
 def _build_discourse_graph_nx(
     dg: DiscourseGraph,
     graph_uri: Optional[URIRef] = None,
+    seed: int = 42,
 ) -> tuple[nx.DiGraph, dict, dict, dict, set]:
     """Build a networkx DiGraph from *dg* using only the public query API.
 
@@ -146,7 +147,7 @@ def _build_discourse_graph_nx(
 
     # ── 5. Layout ─────────────────────────────────────────────────────────────
     if len(G.nodes) > 0:
-        pos = nx.spring_layout(G, seed=42, k=2.0)
+        pos = nx.spring_layout(G, seed=seed, k=2.0)
     else:
         pos = {}
 
@@ -161,6 +162,7 @@ def visualize_graph(
     ax: Optional[matplotlib.axes.Axes] = None,
     title: Optional[str] = None,
     graph_uri: Optional[URIRef] = None,
+    _seed: int = 42,
 ) -> matplotlib.axes.Axes:
     """Render *dg* as a directed node-edge diagram.
 
@@ -189,7 +191,7 @@ def visualize_graph(
     if ax is None:
         _, ax = plt.subplots(figsize=(10, 7))
 
-    G, pos, label_map, color_map, ingested_set = _build_discourse_graph_nx(dg, graph_uri)
+    G, pos, label_map, color_map, ingested_set = _build_discourse_graph_nx(dg, graph_uri, seed=_seed)
 
     if len(G.nodes) == 0:
         ax.set_title(title or dg._agent.name)
@@ -299,13 +301,14 @@ def visualize_sharing(
     visualize_graph(
         alice_dg,
         ax=ax_alice,
-        title=f"{alice_dg._agent.name} — full graph",
+        title=f"{alice_dg._agent.name} — post-sharing",
     )
 
     visualize_graph(
         bob_dg,
         ax=ax_bob,
         title=f"{bob_dg._agent.name} — post-sharing",
+        _seed=94,
     )
 
     # ── Vertical instance-boundary divider ────────────────────────────────────
@@ -322,9 +325,9 @@ def visualize_sharing(
              fontsize=7, color="lightgray", transform=fig.transFigure)
 
     # ── Cross-panel provenance arrows (shared node in Alice → ingested in Bob) ─
-    # Both calls use seed=42 so positions match the panels drawn above.
+    # Seeds match the panels drawn above (bob uses seed=94 for A1 placement).
     _, alice_pos, _, _, alice_ingested = _build_discourse_graph_nx(alice_dg)
-    _, bob_pos, _, _, bob_ingested = _build_discourse_graph_nx(bob_dg)
+    _, bob_pos, _, _, bob_ingested = _build_discourse_graph_nx(bob_dg, seed=94)
 
     # Alice-originated nodes shared to Bob (Alice panel → Bob panel)
     for _node in bob_ingested:
