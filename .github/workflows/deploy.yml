@@ -28,7 +28,7 @@ jobs:
         run: uv sync --extra notebook
 
       - name: Export notebook to HTML
-        run: uv run marimo export html notebooks/discourse_graph_demo.py -o _site/index.html
+        run: uv run marimo export html --no-include-code notebooks/discourse_graph_demo.py -o _site/index.html
         env:
           MPLBACKEND: Agg
 
